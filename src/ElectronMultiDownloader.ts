@@ -8,7 +8,7 @@ type UpdatedEventFn = (_event: Event, state: 'progressing' | 'interrupted') => P
 /**
  * Enables download handling for a BrowserWindow.
  */
-export class DownloadManager {
+export class ElectronMultiDownloader {
   protected config: DownloadManagerConfig
   protected downloadItems: WeakMap<DownloadItem, DownloadManagerItem>
   protected listeners: WeakMap<
