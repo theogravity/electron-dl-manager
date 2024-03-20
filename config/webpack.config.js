@@ -2,6 +2,7 @@ const path = require('path')
 
 module.exports = {
   mode: 'production',
+  target: 'node',
   entry: './src/index.ts',
   output: {
     path: path.resolve(__dirname, '../dist/umd'),

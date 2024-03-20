@@ -1,3 +1,2 @@
-import { Num } from './Num'
-
-export { Num }
+export * from './types'
+export * from './DownloadManager'
