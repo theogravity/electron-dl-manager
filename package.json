@@ -50,7 +50,10 @@
   "bugs": {
     "url": "https://github.com/tomchen/example-typescript-package/issues"
   },
-  "dependencies": {},
+  "dependencies": {
+    "ext-name": "^5.0.0",
+    "unused-filename": "4.0.1"
+  },
   "peerDependencies": {
     "electron": ">=28"
   },

@@ -1,11 +1,15 @@
 import crypto from 'crypto'
 import type { BrowserWindow, DownloadItem, Event, WebContents } from 'electron'
+import { app } from 'electron'
+import extName from 'ext-name'
 import {
   DownloadManagerCallbacks,
   DownloadManagerConstructorParams,
   DownloadManagerItem,
   DownloadParams,
 } from './types'
+import * as path from 'path'
+import { unusedFilenameSync } from 'unused-filename'
 
 type DoneEventFn = (_event: Event, state: 'completed' | 'cancelled' | 'interrupted') => Promise<void>
 type UpdatedEventFn = (_event: Event, state: 'progressing' | 'interrupted') => Promise<void>
@@ -27,6 +31,17 @@ function tUrl(url: string) {
     return url.slice(0, 50) + '...'
   }
   return url
+}
+
+// Copied from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L10
+const getFilenameFromMime = (name: string, mime: string) => {
+  const extensions = extName.mime(mime)
+
+  if (extensions.length !== 1) {
+    return name
+  }
+
+  return `${name}.${extensions[0].ext}`
 }
 
 /**
@@ -63,10 +78,10 @@ export class ElectronMultiDownloader {
    * Starts a download. If saveDialogOptions has been defined in the config,
    * the saveAs dialog will show up first.
    */
-  download({ window, url, downloadURLOptions, callbacks, saveDialogOptions }: DownloadParams) {
-    this.log(`Registering download for url: ${tUrl(url)}`)
-    window.webContents.session.once('will-download', this.onWillDownload({ callbacks, saveDialogOptions }))
-    window.webContents.downloadURL(url, downloadURLOptions)
+  download(params: DownloadParams) {
+    this.log(`Registering download for url: ${tUrl(params.url)}`)
+    params.window.webContents.session.once('will-download', this.onWillDownload(params))
+    params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
   }
 
   /**
@@ -156,20 +171,51 @@ export class ElectronMultiDownloader {
 
   /**
    * Handles when the user initiates a download action by adding the developer-defined
-   * listeners to the download item events.
+   * listeners to the download item events. Attaches to the session `will-download` event.
    */
   protected onWillDownload({
+    directory,
+    overwrite,
+    saveAsFilename,
     callbacks,
     saveDialogOptions,
   }: {
+    overwrite?: boolean
+    directory?: string
+    saveAsFilename?: string
     callbacks: DownloadManagerCallbacks
     saveDialogOptions?: Electron.CrossProcessExports.SaveDialogOptions
   }) {
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
+      // Begin adapted code from
+      // https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
+
+      if (directory && !path.isAbsolute(directory)) {
+        throw new Error('The `directory` option must be an absolute path')
+      }
+
+      directory = directory || app.getPath('downloads')
+
+      let filePath
+      if (saveAsFilename) {
+        filePath = path.join(directory, saveAsFilename)
+      } else {
+        const filename = item.getFilename()
+        const name = path.extname(filename) ? filename : getFilenameFromMime(filename, item.getMimeType())
+
+        filePath = overwrite ? path.join(directory, name) : unusedFilenameSync(path.join(directory, name))
+      }
+
       if (saveDialogOptions) {
         this.log(`Prompting save as dialog`)
-        item.setSaveDialogOptions(saveDialogOptions)
+        item.pause()
+        item.setSaveDialogOptions({ defaultPath: filePath, ...saveDialogOptions })
+      } else {
+        this.log(`Setting save path to ${filePath}`)
+        item.setSavePath(filePath)
       }
+
+      // End adapted code from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
 
       const id = this.calculateId(item)
 
@@ -179,6 +225,7 @@ export class ElectronMultiDownloader {
       this.downloadItems.set(item, {
         id,
         percentCompleted: 0,
+        resolvedFilename: item.getFilename(),
       })
 
       this.idToDownloadItems[id] = item
@@ -289,6 +336,7 @@ export class ElectronMultiDownloader {
 
     if (data) {
       data.percentCompleted = parseFloat(((item.getReceivedBytes() / item.getTotalBytes()) * 100).toFixed(2))
+      data.resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
     }
   }
 
