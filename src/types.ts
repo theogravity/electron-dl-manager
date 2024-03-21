@@ -51,13 +51,13 @@ export type DownloadCancelledFn = (data: DownloadManagerCallbackData) => Promise
  */
 export type DownloadCompletedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
 /**
- * The download has failed
- */
-export type ErrorFn = (error: Error, data?: Partial<DownloadManagerCallbackData>) => Promise<void> | void
-/**
  * The download was interrupted
  */
 export type DownloadInterruptedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+/**
+ * The download has failed
+ */
+export type ErrorFn = (error: Error, data?: Partial<DownloadManagerCallbackData>) => Promise<void> | void
 
 export interface DownloadManagerConstructorParams {
   /**
@@ -84,13 +84,13 @@ export interface DownloadManagerCallbacks {
    */
   onDownloadCancelled?: DownloadCancelledFn
   /**
-   * When an error has been encountered. Note the signature is (error, <maybe some data>).
-   */
-  onError?: ErrorFn
-  /**
    * When the download has been interrupted
    */
   onDownloadInterrupted?: DownloadInterruptedFn
+  /**
+   * When an error has been encountered. Note the signature is (error, <maybe some data>).
+   */
+  onError?: ErrorFn
 }
 
 export interface DownloadParams {
@@ -108,11 +108,15 @@ export interface DownloadParams {
   callbacks: DownloadManagerCallbacks
   /**
    * Electron.DownloadURLOptions to pass to the downloadURL method
+   *
+   * @see https://www.electronjs.org/docs/latest/api/session#sesdownloadurlurl-options
    */
   downloadURLOptions?: Electron.DownloadURLOptions
   /**
    * If defined, will show a save dialog when the user
    * downloads a file.
+   *
+   * @see https://www.electronjs.org/docs/latest/api/dialog#dialogshowsavedialogbrowserwindow-options
    */
   saveDialogOptions?: SaveDialogOptions
   /**

@@ -1,5 +1,5 @@
 // ElectronMultiDownloader.test.ts
-import { DownloadParams, DownloadManagerCallbacks, ElectronMultiDownloader } from '../src'
+import { DownloadParams, DownloadManagerCallbacks, ElectronDownloadManager } from '../src'
 import EventEmitter from 'events'
 import { BrowserWindow, Event, DownloadItem, WebContents, Session, Debugger, dialog } from 'electron'
 
@@ -55,7 +55,7 @@ jest.mock('unused-filename', () => ({
 }));
 
 describe('ElectronMultiDownloader', () => {
-  let instance: ElectronMultiDownloader;
+  let instance: ElectronDownloadManager;
   let window: BrowserWindow;
   let downloadItem: Partial<DownloadItem>;
   let downloadItemData = {
@@ -99,7 +99,7 @@ describe('ElectronMultiDownloader', () => {
       once: emitter.once.bind(emitter)
     };
 
-    instance = new ElectronMultiDownloader({
+    instance = new ElectronDownloadManager({
       // debugLogger: console.log
     });
   });

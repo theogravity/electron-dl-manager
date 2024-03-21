@@ -48,7 +48,7 @@ const getFilenameFromMime = (name: string, mime: string) => {
 /**
  * Enables handling downloads in Electron.
  */
-export class ElectronMultiDownloader {
+export class ElectronDownloadManager {
   // WeakMap for auto-cleanup when the download is done
   protected downloadItems: WeakMap<DownloadItem, DownloadManagerItem>
   // Reverse lookup for download items. Mainly used for operations like item cancellation

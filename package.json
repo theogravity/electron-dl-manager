@@ -1,7 +1,7 @@
 {
-  "name": "electron-multi-downloader",
-  "version": "0.0.1",
-  "description": "",
+  "name": "electron-dl-manager",
+  "version": "1.0.0",
+  "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
   "umd:main": "dist/umd/index.js",
@@ -28,34 +28,33 @@
     "dist"
   ],
   "keywords": [
-    "example",
-    "typescript",
-    "npm",
-    "package",
-    "sample",
-    "boilerplate",
-    "starter",
-    "demo",
-    "cjs",
-    "esm",
-    "umd"
+    "electron",
+    "app",
+    "file",
+    "download",
+    "downloader",
+    "progress",
+    "multi",
+    "electron-dl",
+    "manager",
+    "library"
   ],
-  "author": "Tom Chen <tomchen.org@gmail.com>",
+  "author": "Theo Gravity <theo@suteki.nu>",
   "license": "MIT",
-  "homepage": "https://github.com/tomchen/example-typescript-package",
+  "homepage": "https://github.com/theogravity/electron-dl-manager",
   "repository": {
     "type": "git",
-    "url": "git@github.com:tomchen/example-typescript-package.git"
+    "url": "git@github.com:theogravity/electron-dl-manager.git"
   },
   "bugs": {
-    "url": "https://github.com/tomchen/example-typescript-package/issues"
+    "url": "https://github.com/theogravity/electron-dl-manager/issues"
   },
   "dependencies": {
     "ext-name": "^5.0.0",
-    "unused-filename": "4.0.1"
+    "unused-filename": "^4.0.1"
   },
   "peerDependencies": {
-    "electron": ">=28"
+    "electron": ">=26"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.2.1",
