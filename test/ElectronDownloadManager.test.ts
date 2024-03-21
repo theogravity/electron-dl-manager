@@ -1,7 +1,7 @@
 // ElectronMultiDownloader.test.ts
 import { DownloadParams, DownloadManagerCallbacks, ElectronDownloadManager } from '../src'
 import EventEmitter from 'events'
-import { BrowserWindow, Event, DownloadItem, WebContents, Session, Debugger, dialog } from 'electron'
+import { BrowserWindow, DownloadItem, dialog } from 'electron'
 
 jest.mock('electron', () => {
   const originalModule = jest.requireActual('electron');
@@ -57,7 +57,7 @@ jest.mock('unused-filename', () => ({
 describe('ElectronMultiDownloader', () => {
   let instance: ElectronDownloadManager;
   let window: BrowserWindow;
-  let downloadItem: Partial<DownloadItem>;
+  let downloadItem: jest.Mocked<DownloadItem>;
   let downloadItemData = {
     filename: 'test.txt',
     savePath: '/test/path/test.txt'
@@ -74,25 +74,29 @@ describe('ElectronMultiDownloader', () => {
 
     emitter = new EventEmitter();
 
+    // This needs to be more flexible where we can create multiple downloadItem
+    // instances and be able to pass them to their own unique session
     downloadItem = {
       cancel: jest.fn(),
       pause: jest.fn(),
       resume: jest.fn(),
-      getFilename: () => {
+      getFilename: jest.fn().mockImplementation(() => {
         return downloadItemData.filename
-      },
+      }),
       getMimeType: jest.fn(),
       getURL: jest.fn(),
       getETag: jest.fn(),
-      getSavePath: () => {
+      getSavePath: jest.fn().mockImplementation(() => {
         return downloadItemData.savePath
-      },
+      }),
       setSavePath: jest.fn().mockImplementation((str: string) => {
         downloadItemData.savePath = str;
       }),
       getReceivedBytes: jest.fn().mockReturnValue(100),
       getTotalBytes: jest.fn().mockReturnValue(100),
       removeListener: jest.fn(),
+      getState: jest.fn(),
+      isPaused: jest.fn(),
       // @ts-ignore
       on: emitter.on.bind(emitter),
       // @ts-ignore
@@ -104,18 +108,16 @@ describe('ElectronMultiDownloader', () => {
     });
   });
 
-  describe('download', () => {
-    it('should start a download when called with saveAsFilename', () => {
-      const params: DownloadParams = {
-        window,
-        url: 'http://example.com/file.txt',
-        callbacks: {},
-        saveAsFilename: '/tmp/testFile.txt',
-      };
-      instance.download(params);
-      expect(downloadItem.setSavePath).toHaveBeenCalled()
-      expect(window.webContents.downloadURL).toHaveBeenCalledWith(params.url, undefined);
-    });
+  it('should start a download when called with saveAsFilename', () => {
+    const params: DownloadParams = {
+      window,
+      url: 'http://example.com/file.txt',
+      callbacks: {},
+      saveAsFilename: '/tmp/testFile.txt',
+    };
+    instance.download(params);
+    expect(downloadItem.setSavePath).toHaveBeenCalled()
+    expect(window.webContents.downloadURL).toHaveBeenCalledWith(params.url, undefined);
   });
 
   it('should start a download when called with saveDialogOptions', () => {
@@ -132,45 +134,51 @@ describe('ElectronMultiDownloader', () => {
     expect(window.webContents.downloadURL).toHaveBeenCalledWith(params.url, undefined);
   });
 
-  describe('cancelDownload', () => {
-    it('should cancel a download', async () => {
-      const id = 'test-download-id';
-      const params: DownloadParams = {
-        window,
-        url: 'http://example.com/file.txt',
-        callbacks: {},
-        saveAsFilename: '/tmp/testFile.txt',
-      };
-      // Manually setting up for simulation
-      instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+  it('should get the active download count', async () => {
+    const params: DownloadParams = {
+      window,
+      url: 'http://example.com/file.txt',
+      callbacks: {},
+      saveAsFilename: '/tmp/testFile.txt',
+    };
+    instance.download(params);
+    downloadItem.getState.mockReturnValue('progressing');
+    expect(instance.getActiveDownloadCount()).toBe(1);
+  })
 
-      instance.cancelDownload(id);
-      expect(downloadItem.cancel).toHaveBeenCalled();
-    });
+  it('should cancel a download', async () => {
+    const id = 'test-download-id';
+    const params: DownloadParams = {
+      window,
+      url: 'http://example.com/file.txt',
+      callbacks: {},
+      saveAsFilename: '/tmp/testFile.txt',
+    };
+    // Manually setting up for simulation
+    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+
+    instance.cancelDownload(id);
+    expect(downloadItem.cancel).toHaveBeenCalled();
   });
 
-  describe('pauseDownload', () => {
-    it('should pause a download', async () => {
-      const id = 'test-download-id';
-      downloadItem.isPaused = () => false;
-      // Manually setting up for simulation
-      instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+  it('should pause a download', async () => {
+    const id = 'test-download-id';
+    downloadItem.isPaused.mockImplementationOnce(() => false);
+    // Manually setting up for simulation
+    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
 
-      instance.pauseDownload(id);
-      expect(downloadItem.pause).toHaveBeenCalled();
-    });
+    instance.pauseDownload(id);
+    expect(downloadItem.pause).toHaveBeenCalled();
   });
 
-  describe('resumeDownload', () => {
-    it('should resume a paused download', async () => {
-      const id = 'test-download-id';
-      downloadItem.isPaused = () => true;
-      // Manually setting up for simulation
-      instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+  it('should resume a paused download', async () => {
+    const id = 'test-download-id';
+    downloadItem.isPaused.mockImplementationOnce(() => true);
+    // Manually setting up for simulation
+    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
 
-      instance.resumeDownload(id);
-      expect(downloadItem.resume).toHaveBeenCalled();
-    });
+    instance.resumeDownload(id);
+    expect(downloadItem.resume).toHaveBeenCalled();
   });
 
   describe('callbacks', () => {

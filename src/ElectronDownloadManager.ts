@@ -8,6 +8,7 @@ import {
   DownloadManagerConstructorParams,
   DownloadManagerItem,
   DownloadParams,
+  IElectronDownloadManager,
 } from './types'
 import * as path from 'path'
 import { unusedFilenameSync } from 'unused-filename'
@@ -21,6 +22,7 @@ interface ItemHandlerParams {
   item: DownloadItem
   webContents: WebContents
   callbacks: DownloadManagerCallbacks
+  showBadge?: boolean
 }
 
 function tId(id: string) {
@@ -35,15 +37,14 @@ function tUrl(url: string) {
 }
 
 function generateRandomId() {
-  const currentTime = new Date().getTime() // Get the current timestamp
-  const randomNum = Math.floor(Math.random() * 1000) // Generate a random number between 0 and 999
+  const currentTime = new Date().getTime()
+  const randomNum = Math.floor(Math.random() * 1000)
   const combinedValue = currentTime.toString() + randomNum.toString()
 
   const hash = crypto.createHash('sha256')
   hash.update(combinedValue)
-  const randomId = hash.digest('hex').substring(0, 12) // Get the first 12 characters of the hashed value
 
-  return randomId
+  return hash.digest('hex').substring(0, 12)
 }
 
 // Copied from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L10
@@ -60,7 +61,7 @@ const getFilenameFromMime = (name: string, mime: string) => {
 /**
  * Enables handling downloads in Electron.
  */
-export class ElectronDownloadManager {
+export class ElectronDownloadManager implements IElectronDownloadManager {
   // WeakMap for auto-cleanup when the download is done
   protected downloadItems: WeakMap<DownloadItem, DownloadManagerItem>
   // Reverse lookup for download items. Mainly used for operations like item cancellation
@@ -149,6 +150,13 @@ export class ElectronDownloadManager {
     }
   }
 
+  /**
+   * Returns the number of active downloads
+   */
+  getActiveDownloadCount() {
+    return Object.values(this.idToDownloadItems).filter((item) => item.getState() === 'progressing').length
+  }
+
   protected handleError(
     callbacks: DownloadManagerCallbacks,
     error: Error,
@@ -202,13 +210,19 @@ export class ElectronDownloadManager {
     dbg.detach()
   }
 
+  protected updateBadgeCount() {
+    if (process.platform === 'darwin' || process.platform === 'linux') {
+      app.setBadgeCount(this.getActiveDownloadCount())
+    }
+  }
+
   /**
    * Handles when the user initiates a download action by adding the developer-defined
    * listeners to the download item events. Attaches to the session `will-download` event.
    */
   protected onWillDownload(
     id: string,
-    { window, directory, overwrite, saveAsFilename, callbacks, saveDialogOptions }: DownloadParams
+    { window, directory, overwrite, saveAsFilename, callbacks, saveDialogOptions, showBadge }: DownloadParams
   ) {
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       // Begin adapted code from
@@ -289,18 +303,20 @@ export class ElectronDownloadManager {
 
       const updatedHandler = this.itemOnUpdated({
         id,
-        event: event,
-        item: item,
-        webContents: webContents,
-        callbacks: callbacks,
+        event,
+        item,
+        webContents,
+        callbacks,
+        showBadge,
       })
 
       const doneHandler = this.itemOnDone({
         id,
-        event: event,
-        item: item,
-        webContents: webContents,
-        callbacks: callbacks,
+        event,
+        item,
+        webContents,
+        callbacks,
+        showBadge,
       })
 
       this.listeners.set(item, {
@@ -314,14 +330,13 @@ export class ElectronDownloadManager {
     }
   }
 
-  protected itemOnUpdated({ id, event, item, webContents, callbacks }: ItemHandlerParams) {
+  protected itemOnUpdated({ id, event, item, webContents, callbacks, showBadge }: ItemHandlerParams) {
     return async (_event: Event, state: 'progressing' | 'interrupted') => {
       switch (state) {
         case 'progressing': {
           this.updateProgress(item)
           if (callbacks.onDownloadProgress && this.downloadItems.has(item)) {
             const data = this.downloadItems.get(item)!
-
             this.log(`[${tId(id)}] Calling onDownloadProgress ${data.percentCompleted}%`)
 
             try {
@@ -357,10 +372,14 @@ export class ElectronDownloadManager {
           break
         }
       }
+
+      if (showBadge) {
+        this.updateBadgeCount()
+      }
     }
   }
 
-  protected itemOnDone({ id, event, item, webContents, callbacks }: ItemHandlerParams) {
+  protected itemOnDone({ id, event, item, webContents, callbacks, showBadge }: ItemHandlerParams) {
     return async (_event: Event, state: 'completed' | 'cancelled' | 'interrupted') => {
       switch (state) {
         case 'completed': {
@@ -398,6 +417,10 @@ export class ElectronDownloadManager {
             }
           }
           break
+      }
+
+      if (showBadge) {
+        this.updateBadgeCount()
       }
 
       this.cleanup(item)

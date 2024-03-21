@@ -136,4 +136,37 @@ export interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
+  /**
+   * If true, will show a badge on the dock icon when the download is in progress
+   * under MacOS and linux.
+   *
+   * @default false
+   */
+  showBadge?: boolean
+}
+
+export interface IElectronDownloadManager {
+  /**
+   * Starts a download. If saveDialogOptions has been defined in the config,
+   * the saveAs dialog will show up first.
+   *
+   * Returns the id of the download.
+   */
+  download(params: DownloadParams): string
+  /**
+   * Cancels a download
+   */
+  cancelDownload(id: string): void
+  /**
+   * Pauses a download
+   */
+  pauseDownload(id: string): void
+  /**
+   * Resumes a download
+   */
+  resumeDownload(id: string): void
+  /**
+   * Returns the number of active downloads
+   */
+  getActiveDownloadCount(): number
 }

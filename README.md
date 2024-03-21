@@ -61,6 +61,7 @@ manager.resumeDownload(id);
     + [`cancelDownload()`](#-canceldownload---)
     + [`pauseDownload()`](#-pausedownload---)
     + [`resumeDownload()`](#-resumedownload---)
+    + [`getActiveDownloadCount()`](#-getactivedownloadcount---)
 - [Acknowledgments](#acknowledgments)
 
 # Installation
@@ -212,6 +213,13 @@ interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
+  /**
+   * If true, will show a badge on the dock icon when the download is in progress
+   * under MacOS and linux.
+   *
+   * @default false
+   */
+  showBadge?: boolean
 }
 ```
 
@@ -286,6 +294,22 @@ Resumes a download.
 ```typescript
 resumeDownload(id: string): void
 ```
+
+### `getActiveDownloadCount()`
+
+Returns the number of active downloads.
+
+```typescript
+getActiveDownloadCount(): number
+```
+
+# Mock class
+
+If you need to mock out `ElectronDownloadManager` in your tests, you can use the `ElectronDownloadManagerMock` class.
+
+`import { ElectronDownloadManagerMock } from 'electron-dl-manager'`
+
+```typescript
 
 # Acknowledgments
 
