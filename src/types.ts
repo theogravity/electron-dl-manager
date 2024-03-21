@@ -11,10 +11,7 @@ export interface DownloadManagerItem {
   percentCompleted: number
   /**
    * The name of the file that is being saved to the user's computer.
-   * Use this when using setSaveDialogOptions() to get the filename the user chose.
-   * This value may change at any time since the DownloadItem runs concurrently to
-   * the save dialog, and we don't know when the user has chosen a filename.
-   * @default DownloadItem.getFilename()
+   * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
    */
   resolvedFilename: string
 }
@@ -40,19 +37,27 @@ export interface DownloadManagerCallbackData extends DownloadManagerItem {
 /**
  * The download has started
  */
-export type DownloadStartedFn = (data: DownloadManagerCallbackData) => Promise<void>
+export type DownloadStartedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
 /**
  * There is progress on the download
  */
-export type DownloadProgressFn = (data: DownloadManagerCallbackData) => Promise<void>
+export type DownloadProgressFn = (data: DownloadManagerCallbackData) => Promise<void> | void
 /**
  * The download has been cancelled
  */
-export type DownloadCancelledFn = (data: DownloadManagerCallbackData) => Promise<void>
+export type DownloadCancelledFn = (data: DownloadManagerCallbackData) => Promise<void> | void
 /**
  * The download has completed
  */
-export type DownloadCompletedFn = (data: DownloadManagerCallbackData) => Promise<void>
+export type DownloadCompletedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+/**
+ * The download has failed
+ */
+export type ErrorFn = (error: Error, data?: Partial<DownloadManagerCallbackData>) => Promise<void> | void
+/**
+ * The download was interrupted
+ */
+export type DownloadInterruptedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
 
 export interface DownloadManagerConstructorParams {
   /**
@@ -64,14 +69,10 @@ export interface DownloadManagerConstructorParams {
 export interface DownloadManagerCallbacks {
   /**
    * When the download has started.
-   * Note: When using setSaveDialogOptions(), this will be called even when the user is still choosing a save location.
-   * In this situation, the DownloadItem data may change.
    */
   onDownloadStarted?: DownloadStartedFn
   /**
    * When there is a progress update on a download
-   * Note: When using setSaveDialogOptions(), this will be called even when the user is still choosing a save location.
-   * In this situation, the DownloadItem data may change, so be sure to check the filename, etc on the DownloadItem.
    */
   onDownloadProgress?: DownloadProgressFn
   /**
@@ -82,6 +83,14 @@ export interface DownloadManagerCallbacks {
    * When the download has been cancelled
    */
   onDownloadCancelled?: DownloadCancelledFn
+  /**
+   * When an error has been encountered. Note the signature is (error, <maybe some data>).
+   */
+  onError?: ErrorFn
+  /**
+   * When the download has been interrupted
+   */
+  onDownloadInterrupted?: DownloadInterruptedFn
 }
 
 export interface DownloadParams {
@@ -105,7 +114,7 @@ export interface DownloadParams {
    * If defined, will show a save dialog when the user
    * downloads a file.
    */
-  saveDialogOptions: SaveDialogOptions
+  saveDialogOptions?: SaveDialogOptions
   /**
    * The filename to save the file as. If not defined, the filename
    * from the server will be used.

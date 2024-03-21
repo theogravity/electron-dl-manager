@@ -1,8 +1,9 @@
 import crypto from 'crypto'
 import type { BrowserWindow, DownloadItem, Event, WebContents } from 'electron'
-import { app } from 'electron'
+import { app, dialog } from 'electron'
 import extName from 'ext-name'
 import {
+  DownloadManagerCallbackData,
   DownloadManagerCallbacks,
   DownloadManagerConstructorParams,
   DownloadManagerItem,
@@ -79,6 +80,10 @@ export class ElectronMultiDownloader {
    * the saveAs dialog will show up first.
    */
   download(params: DownloadParams) {
+    if (!params.saveAsFilename && !params.saveDialogOptions) {
+      throw new Error('You must define either saveAsFilename or saveDialogOptions to start a download')
+    }
+
     this.log(`Registering download for url: ${tUrl(params.url)}`)
     params.window.webContents.session.once('will-download', this.onWillDownload(params))
     params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
@@ -94,7 +99,7 @@ export class ElectronMultiDownloader {
       this.log(`[${tId(id)}] Cancelling download`)
       item.cancel()
     } else {
-      this.log(`[${tId(id)}] Download not found for cancellation`)
+      this.log(`[${tId(id)}] Download ${id} not found for cancellation`)
     }
   }
 
@@ -108,7 +113,7 @@ export class ElectronMultiDownloader {
       this.log(`[${tId(id)}] Pausing download`)
       item.pause()
     } else {
-      this.log(`[${tId(id)}] Download not found for pausing`)
+      this.log(`[${tId(id)}] Download ${id} not found for pausing`)
     }
   }
 
@@ -122,7 +127,17 @@ export class ElectronMultiDownloader {
       this.log(`[${tId(id)}] Resuming download`)
       item.resume()
     } else {
-      this.log(`[${tId(id)}] Download not found or is not in a paused state`)
+      this.log(`[${tId(id)}] Download ${id} not found or is not in a paused state`)
+    }
+  }
+
+  protected handleError(
+    callbacks: DownloadManagerCallbacks,
+    error: Error,
+    data?: Partial<DownloadManagerCallbackData>
+  ) {
+    if (callbacks.onError) {
+      callbacks.onError(error, data)
     }
   }
 
@@ -174,12 +189,14 @@ export class ElectronMultiDownloader {
    * listeners to the download item events. Attaches to the session `will-download` event.
    */
   protected onWillDownload({
+    window,
     directory,
     overwrite,
     saveAsFilename,
     callbacks,
     saveDialogOptions,
   }: {
+    window: BrowserWindow
     overwrite?: boolean
     directory?: string
     saveAsFilename?: string
@@ -209,7 +226,25 @@ export class ElectronMultiDownloader {
       if (saveDialogOptions) {
         this.log(`Prompting save as dialog`)
         item.pause()
-        item.setSaveDialogOptions({ defaultPath: filePath, ...saveDialogOptions })
+
+        let result
+
+        try {
+          result = await dialog.showSaveDialog(window, { defaultPath: filePath, ...saveDialogOptions })
+        } catch (e) {
+          this.log(`Error while showing save dialog: ${e}`)
+          this.handleError(callbacks, e as Error, { item, event, webContents })
+          item.cancel()
+          return
+        }
+
+        if (result.canceled) {
+          item.cancel()
+          return
+        } else {
+          item.setSavePath(result.filePath!)
+          item.resume()
+        }
       } else {
         this.log(`Setting save path to ${filePath}`)
         item.setSavePath(filePath)
@@ -218,26 +253,32 @@ export class ElectronMultiDownloader {
       // End adapted code from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
 
       const id = this.calculateId(item)
+      const resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
 
-      this.log(`[${tId(id)}] Associating to ${item.getFilename()}`)
+      this.log(`[${tId(id)}] Associating ${id} to ${resolvedFilename}`)
       this.log(`[${tId(id)}] Initiating download item handlers`)
 
       this.downloadItems.set(item, {
         id,
         percentCompleted: 0,
-        resolvedFilename: item.getFilename(),
+        resolvedFilename,
       })
 
       this.idToDownloadItems[id] = item
 
       if (callbacks.onDownloadStarted && this.downloadItems.has(item)) {
         this.log(`[${tId(id)}] Calling onDownloadStarted`)
-        await callbacks.onDownloadStarted({
-          ...this.downloadItems.get(item)!,
-          item,
-          event,
-          webContents,
-        })
+        try {
+          await callbacks.onDownloadStarted({
+            ...this.downloadItems.get(item)!,
+            item,
+            event,
+            webContents,
+          })
+        } catch (e) {
+          this.log(`[${tId(id)}] Error during onDownloadStarted: ${e}`)
+          this.handleError(callbacks, e as Error, { item, event, webContents })
+        }
       }
 
       const updatedHandler = this.itemOnUpdated({
@@ -277,17 +318,36 @@ export class ElectronMultiDownloader {
 
             this.log(`[${tId(id)}] Calling onDownloadProgress ${data.percentCompleted}%`)
 
-            await callbacks.onDownloadProgress({
-              ...data,
-              item,
-              event,
-              webContents,
-            })
+            try {
+              await callbacks.onDownloadProgress({
+                ...data,
+                item,
+                event,
+                webContents,
+              })
+            } catch (e) {
+              this.log(`[${tId(id)}] Error during onDownloadProgress: ${e}`)
+              this.handleError(callbacks, e as Error, { item, event, webContents, ...data })
+            }
           }
           break
         }
         case 'interrupted': {
-          this.log(`onUpdated interrupted ${tId(id)}`)
+          if (callbacks.onDownloadInterrupted && this.downloadItems.has(item)) {
+            this.log(`[${tId(id)}] Calling onDownloadInterrupted`)
+
+            try {
+              await callbacks.onDownloadInterrupted({
+                ...this.downloadItems.get(item)!,
+                item,
+                event,
+                webContents,
+              })
+            } catch (e) {
+              this.log(`[${tId(id)}] Error during onDownloadInterrupted: ${e}`)
+              this.handleError(callbacks, e as Error, { item, event, webContents })
+            }
+          }
           break
         }
       }
@@ -301,12 +361,17 @@ export class ElectronMultiDownloader {
           if (callbacks.onDownloadCompleted && this.downloadItems.has(item)) {
             this.log(`[${tId(id)}] Calling onDownloadCompleted`)
 
-            await callbacks.onDownloadCompleted({
-              ...this.downloadItems.get(item)!,
-              item,
-              event,
-              webContents,
-            })
+            try {
+              await callbacks.onDownloadCompleted({
+                ...this.downloadItems.get(item)!,
+                item,
+                event,
+                webContents,
+              })
+            } catch (e) {
+              this.log(`[${tId(id)}] Error during onDownloadCompleted: ${e}`)
+              this.handleError(callbacks, e as Error, { item, event, webContents })
+            }
           }
           break
         }
@@ -314,16 +379,18 @@ export class ElectronMultiDownloader {
           if (callbacks.onDownloadCancelled && this.downloadItems.has(item)) {
             this.log(`[${tId(id)}] Calling onDownloadCancelled`)
 
-            await callbacks.onDownloadCancelled({
-              ...this.downloadItems.get(item)!,
-              item,
-              event,
-              webContents,
-            })
+            try {
+              await callbacks.onDownloadCancelled({
+                ...this.downloadItems.get(item)!,
+                item,
+                event,
+                webContents,
+              })
+            } catch (e) {
+              this.log(`[${tId(id)}] Error during onDownloadCancelled: ${e}`)
+              this.handleError(callbacks, e as Error, { item, event, webContents })
+            }
           }
-          break
-        case 'interrupted':
-          this.log(`[${tId(id)}] itemOnDone interrupted`)
           break
       }
 
@@ -336,7 +403,6 @@ export class ElectronMultiDownloader {
 
     if (data) {
       data.percentCompleted = parseFloat(((item.getReceivedBytes() / item.getTotalBytes()) * 100).toFixed(2))
-      data.resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
     }
   }
 
