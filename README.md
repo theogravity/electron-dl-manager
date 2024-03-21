@@ -50,7 +50,6 @@ manager.resumeDownload(id);
 
 # Table of Contents
 
-- [Electron File Download Manager](#electron-file-download-manager)
 - [Installation](#installation)
 - [Getting started](#getting-started)
 - [API](#api)
@@ -84,8 +83,6 @@ use any IPC strategy you want.
 
 import { FileDownloadManager } from 'electron-dl-manager';
 import { ipcMain } from 'electron';
-import is from "@sindresorhus/is";
-import error = is.error;
 
 const manager = new FileDownloadManager();
 
