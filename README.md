@@ -93,14 +93,12 @@ ipcMain.handle('download-file', async (event, args) => {
   let downloadId
   const browserWindow = BrowserWindow.fromId(event.sender.id)
 
-  manager.download({
+  downloadId = manager.download({
     window: browserWindow,
     url,
     callbacks: {
       // item is an instance of Electron.DownloadItem
       onDownloadStarted: async ({ id, item, resolvedFilename }) => {
-        downloadId = id;
-
         // Send the download id back to the renderer along
         // with some other data
         browserWindow.webContents.invoke('download-started', {
@@ -133,6 +131,9 @@ ipcMain.handle('download-file', async (event, args) => {
       }
     }
   });
+  
+  // Pause the download
+  manager.pauseDownload(downloadId);
 });
 ```
 
@@ -159,10 +160,10 @@ interface DownloadManagerConstructorParams {
 
 ### `download()`
 
-Starts a file download.
+Starts a file download. Returns the `id` of the download.
 
 ```typescript
-download(params: DownloadParams): void
+download(params: DownloadParams): string
 ```
 
 #### Interface: `DownloadParams`

@@ -34,6 +34,18 @@ function tUrl(url: string) {
   return url
 }
 
+function generateRandomId() {
+  const currentTime = new Date().getTime() // Get the current timestamp
+  const randomNum = Math.floor(Math.random() * 1000) // Generate a random number between 0 and 999
+  const combinedValue = currentTime.toString() + randomNum.toString()
+
+  const hash = crypto.createHash('sha256')
+  hash.update(combinedValue)
+  const randomId = hash.digest('hex').substring(0, 12) // Get the first 12 characters of the hashed value
+
+  return randomId
+}
+
 // Copied from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L10
 const getFilenameFromMime = (name: string, mime: string) => {
   const extensions = extName.mime(mime)
@@ -78,15 +90,21 @@ export class ElectronDownloadManager {
   /**
    * Starts a download. If saveDialogOptions has been defined in the config,
    * the saveAs dialog will show up first.
+   *
+   * Returns the id of the download.
    */
   download(params: DownloadParams) {
     if (!params.saveAsFilename && !params.saveDialogOptions) {
       throw new Error('You must define either saveAsFilename or saveDialogOptions to start a download')
     }
 
+    const id = generateRandomId()
+
     this.log(`Registering download for url: ${tUrl(params.url)}`)
-    params.window.webContents.session.once('will-download', this.onWillDownload(params))
+    params.window.webContents.session.once('will-download', this.onWillDownload(id, params))
     params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
+
+    return id
   }
 
   /**
@@ -188,21 +206,10 @@ export class ElectronDownloadManager {
    * Handles when the user initiates a download action by adding the developer-defined
    * listeners to the download item events. Attaches to the session `will-download` event.
    */
-  protected onWillDownload({
-    window,
-    directory,
-    overwrite,
-    saveAsFilename,
-    callbacks,
-    saveDialogOptions,
-  }: {
-    window: BrowserWindow
-    overwrite?: boolean
-    directory?: string
-    saveAsFilename?: string
-    callbacks: DownloadManagerCallbacks
-    saveDialogOptions?: Electron.CrossProcessExports.SaveDialogOptions
-  }) {
+  protected onWillDownload(
+    id: string,
+    { window, directory, overwrite, saveAsFilename, callbacks, saveDialogOptions }: DownloadParams
+  ) {
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       // Begin adapted code from
       // https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
@@ -252,7 +259,6 @@ export class ElectronDownloadManager {
 
       // End adapted code from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
 
-      const id = this.calculateId(item)
       const resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
 
       this.log(`[${tId(id)}] Associating ${id} to ${resolvedFilename}`)
@@ -404,12 +410,6 @@ export class ElectronDownloadManager {
     if (data) {
       data.percentCompleted = parseFloat(((item.getReceivedBytes() / item.getTotalBytes()) * 100).toFixed(2))
     }
-  }
-
-  protected calculateId(item: DownloadItem): string {
-    const toHash = item.getURL() + item.getETag() + item.getFilename() + item.getSavePath()
-
-    return crypto.createHash('sha256').update(toHash).digest('hex')
   }
 
   protected cleanup(item: DownloadItem) {
