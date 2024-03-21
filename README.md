@@ -91,9 +91,10 @@ ipcMain.handle('download-file', async (event, args) => {
   const { url } = args;
 
   let downloadId
+  const browserWindow = BrowserWindow.fromId(event.sender.id)
 
   manager.download({
-    window: BrowserWindow.fromId(event.sender.id),
+    window: browserWindow,
     url,
     callbacks: {
       // item is an instance of Electron.DownloadItem
@@ -102,7 +103,7 @@ ipcMain.handle('download-file', async (event, args) => {
 
         // Send the download id back to the renderer along
         // with some other data
-        ipcMain.invoke('download-started', {
+        browserWindow.webContents.invoke('download-started', {
           id,
           // The filename that the file will be saved as
           filename: resolvedFilename,
@@ -112,7 +113,7 @@ ipcMain.handle('download-file', async (event, args) => {
       },
       onDownloadProgress: async ({ id, item, percentCompleted }) => {
         // Send the download progress back to the renderer
-        ipcMain.invoke('download-progress', {
+        browserWindow.webContents.invoke('download-progress', {
           id,
           percentCompleted,
           // Get the number of bytes received so far
@@ -121,7 +122,7 @@ ipcMain.handle('download-file', async (event, args) => {
       },
       onDownloadCompleted: async ({ id, item }) => {
         // Send the download completion back to the renderer
-        ipcMain.invoke('download-completed', {
+        browserWindow.webContents.invoke('download-completed', {
           id,
           // Get the path to the file that was downloaded
           filePath: item.getSavePath(),
