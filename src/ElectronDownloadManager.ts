@@ -218,32 +218,27 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    */
   protected onWillDownload(
     id: string,
-    { window, directory, overwrite, saveAsFilename, callbacks, saveDialogOptions, showBadge }: DownloadParams
+    { directory, overwrite, saveAsFilename, callbacks, saveDialogOptions, showBadge }: DownloadParams
   ) {
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       item.pause()
-
-      const cancel = async () => {
-        item.cancel()
-        if (callbacks.onDownloadCancelled) {
-          this.log(`[${id}] Calling onDownloadCancelled`)
-
+      const start = async () => {
+        if (callbacks.onDownloadStarted) {
+          this.log(`[${id}] Calling onDownloadStarted`)
           try {
-            await callbacks.onDownloadCancelled({
-              id,
+            await callbacks.onDownloadStarted({
+              ...downloadData,
               item,
               event,
               webContents,
-              percentCompleted: 0,
-              resolvedFilename: item.getFilename(),
-              cancelledFromSaveAsDialog: true,
             })
           } catch (e) {
-            this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
-            this.handleError(callbacks, e as Error, { id, item, event, webContents, cancelledFromSaveAsDialog: true })
+            this.log(`[${id}] Error during onDownloadStarted: ${e}`)
+            this.handleError(callbacks, e as Error, { id, item, event, webContents })
           }
         }
       }
+
       // Begin adapted code from
       // https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
 
@@ -265,24 +260,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
       if (saveDialogOptions) {
         this.log(`[${id}] Prompting save as dialog`)
-        let result
-
-        try {
-          result = await dialog.showSaveDialog(window, { defaultPath: filePath, ...saveDialogOptions })
-        } catch (e) {
-          this.log(`[${id}] Error while showing save dialog: ${e}`)
-          this.handleError(callbacks, e as Error, { item, event, webContents })
-          await cancel()
-          return
-        }
-
-        if (result.canceled) {
-          this.log(`[${id}] User cancelled save as dialog`)
-          await cancel()
-          return
-        } else {
-          item.setSavePath(result.filePath!)
-        }
+        // This actually isn't what shows the save dialog
+        // If item.setSavePath() isn't called at all after some tiny period of time,
+        // then the save dialog will show up, and it will use the options we set it to here
+        item.setSaveDialogOptions({ ...saveDialogOptions, defaultPath: filePath })
       } else {
         this.log(`Setting save path to ${filePath}`)
         item.setSavePath(filePath)
@@ -293,7 +274,6 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       const resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
 
       this.log(`[${id}] Associating ${id} to ${resolvedFilename}`)
-      this.log(`[${id}] Initiating download item handlers`)
 
       const downloadData = {
         id,
@@ -304,21 +284,6 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       this.downloadItems.set(item, downloadData)
 
       this.idToDownloadItems[id] = item
-
-      if (callbacks.onDownloadStarted) {
-        this.log(`[${id}] Calling onDownloadStarted`)
-        try {
-          await callbacks.onDownloadStarted({
-            ...downloadData,
-            item,
-            event,
-            webContents,
-          })
-        } catch (e) {
-          this.log(`[${id}] Error during onDownloadStarted: ${e}`)
-          this.handleError(callbacks, e as Error, { id, item, event, webContents })
-        }
-      }
 
       const handlerConfig = {
         id,
@@ -338,9 +303,52 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         updated: updatedHandler,
       })
 
-      item.on('updated', updatedHandler)
-      item.once('done', doneHandler)
-      item.resume()
+      if (saveDialogOptions) {
+        // Because the download happens concurrently as the user is choosing a save location
+        // we need to wait for the save location to be chosen before we can start to fire out events
+        // there's no good way to listen for this, so we need to poll
+        const interval = setInterval(async () => {
+          if (item.getSavePath()) {
+            this.log(`User selected save path to ${item.getSavePath()}`)
+            this.log(`[${id}] Initiating download item handlers`)
+            clearInterval(interval)
+            await start()
+            item.on('updated', updatedHandler)
+            item.once('done', doneHandler)
+            item.resume()
+          } else if (item.getState() === 'cancelled') {
+            clearInterval(interval)
+            this.log(`[${id}] Download was cancelled by user`)
+            if (callbacks.onDownloadCancelled) {
+              this.log(`[${id}] Calling onDownloadCancelled`)
+
+              try {
+                await callbacks.onDownloadCancelled({
+                  id,
+                  item,
+                  event,
+                  webContents,
+                  cancelledFromSaveAsDialog: true,
+                  percentCompleted: 0,
+                  resolvedFilename: '',
+                })
+              } catch (e) {
+                this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
+                this.handleError(callbacks, e as Error, { item, event, webContents })
+              }
+            }
+          } else {
+            this.log(`[${id}] Waiting for save path to be chosen by user`)
+          }
+        }, 500)
+      } else {
+        this.log(`[${id}] Initiating download item handlers`)
+
+        await start()
+        item.on('updated', updatedHandler)
+        item.once('done', doneHandler)
+        item.resume()
+      }
     }
   }
 

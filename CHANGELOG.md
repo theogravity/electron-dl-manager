@@ -1,3 +1,8 @@
+# 1.2.0 (2024-03-21)
+
+- Fixes a major issue where a download would not complete if using the save as dialog
+- Fixes internal static method `disableThrottle()` where it was not working / throwing
+
 # 1.1.1 (2024-03-21)
 
 - Fix issues around downloading smaller files where the download would complete before the progress / completed event was emitted

@@ -1,7 +1,7 @@
 // ElectronMultiDownloader.test.ts
 import { DownloadParams, DownloadManagerCallbacks, ElectronDownloadManager } from '../src'
 import EventEmitter from 'events'
-import { BrowserWindow, DownloadItem, dialog } from 'electron'
+import { BrowserWindow, DownloadItem } from 'electron'
 
 jest.mock('electron', () => {
   const originalModule = jest.requireActual('electron');
@@ -10,12 +10,6 @@ jest.mock('electron', () => {
     ...originalModule,
     app: {
       getPath: jest.fn().mockReturnValue('/default/path'),
-    },
-    dialog: {
-      showSaveDialog: jest.fn().mockReturnValue({
-        canceled: false,
-        filePath: '/test/path/test.txt'
-      }),
     },
     BrowserWindow: jest.fn().mockImplementation(() => ({
       webContents: {
@@ -80,6 +74,7 @@ describe('ElectronMultiDownloader', () => {
       cancel: jest.fn(),
       pause: jest.fn(),
       resume: jest.fn(),
+      setSaveDialogOptions: jest.fn(),
       getFilename: jest.fn().mockImplementation(() => {
         return downloadItemData.filename
       }),
@@ -130,7 +125,7 @@ describe('ElectronMultiDownloader', () => {
       }
     };
     instance.download(params);
-    expect(dialog.showSaveDialog).toHaveBeenCalled()
+    expect(downloadItem.setSaveDialogOptions).toHaveBeenCalled()
     expect(window.webContents.downloadURL).toHaveBeenCalledWith(params.url, undefined);
   });
 
@@ -209,6 +204,8 @@ describe('ElectronMultiDownloader', () => {
       const params: DownloadParams = { window, url: 'http://example.com/file.txt', callbacks, saveAsFilename: '/tmp/testFile.txt', };
 
       instance.download(params);
+      // Need this because of the await start() when setting up the handlers
+      await new Promise((r) => setTimeout(r, 0));
       emitter.emit('updated', null, 'progressing')
 
       expect(mockOnDownloadProgress).toHaveBeenCalledWith({
@@ -229,6 +226,8 @@ describe('ElectronMultiDownloader', () => {
       const params: DownloadParams = { window, url: 'http://example.com/file.txt', callbacks, saveAsFilename: '/tmp/testFile.txt', };
 
       instance.download(params);
+      // Need this because of the await start() when setting up the handlers
+      await new Promise((r) => setTimeout(r, 0));
       emitter.emit('done', null, 'completed')
 
       expect(mockOnDownloadCompleted).toHaveBeenCalledWith({
@@ -248,6 +247,8 @@ describe('ElectronMultiDownloader', () => {
       };
       const params: DownloadParams = { window, url: 'http://example.com/file.txt', callbacks, saveAsFilename: '/tmp/testFile.txt', };
       instance.download(params);
+      // Need this because of the await start() when setting up the handlers
+      await new Promise((r) => setTimeout(r, 0));
       emitter.emit('done', null, 'cancelled')
 
       expect(mockOnDownloadCancelled).toHaveBeenCalledWith({
