@@ -199,8 +199,8 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     await dbg.sendCommand('Network.enable')
     await dbg.sendCommand('Network.emulateNetworkConditions', {
       offline: false,
-      upload: -1,
-      download: -1,
+      downloadThroughput: -1,
+      uploadThroughput: -1,
       latency: 0,
     })
     dbg.detach()
