@@ -1,6 +1,6 @@
 import crypto from 'crypto'
 import type { BrowserWindow, DownloadItem, Event, WebContents } from 'electron'
-import { app, dialog } from 'electron'
+import { app } from 'electron'
 import extName from 'ext-name'
 import {
   DownloadManagerCallbackData,
@@ -258,6 +258,8 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         filePath = overwrite ? path.join(directory, name) : unusedFilenameSync(path.join(directory, name))
       }
 
+      let resolvedFilename = ''
+
       if (saveDialogOptions) {
         this.log(`[${id}] Prompting save as dialog`)
         // This actually isn't what shows the save dialog
@@ -265,15 +267,12 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         // then the save dialog will show up, and it will use the options we set it to here
         item.setSaveDialogOptions({ ...saveDialogOptions, defaultPath: filePath })
       } else {
-        this.log(`Setting save path to ${filePath}`)
+        this.log(`[${id}] Setting save path to ${filePath}`)
         item.setSavePath(filePath)
+        resolvedFilename = path.basename(item.getSavePath())
       }
 
       // End adapted code from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
-
-      const resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
-
-      this.log(`[${id}] Associating ${id} to ${resolvedFilename}`)
 
       const downloadData = {
         id,
@@ -308,13 +307,45 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         // we need to wait for the save location to be chosen before we can start to fire out events
         // there's no good way to listen for this, so we need to poll
         const interval = setInterval(async () => {
+          // It seems to unpause sometimes in the dialog situation ???
+          // item.getState() value becomes 'completed' for small files
+          // before item.resume() is called
+          item.pause()
+
           if (item.getSavePath()) {
             this.log(`User selected save path to ${item.getSavePath()}`)
             this.log(`[${id}] Initiating download item handlers`)
+
+            // Update the resolvedFilename to the user-selected path
+            downloadData.resolvedFilename = path.basename(item.getSavePath())
+
             clearInterval(interval)
             await start()
-            item.on('updated', updatedHandler)
-            item.once('done', doneHandler)
+            // If for some reason the above pause didn't work...
+            // We'll manually call the completed handler
+            if (item.getState() === 'completed') {
+              if (callbacks.onDownloadCompleted) {
+                this.log(`[${id}] Calling onDownloadCompleted`)
+
+                try {
+                  await callbacks.onDownloadCompleted({
+                    id,
+                    item,
+                    event,
+                    webContents,
+                    percentCompleted: 100,
+                    resolvedFilename: path.basename(item.getSavePath()),
+                  })
+                } catch (e) {
+                  this.log(`[${id}] Error during onDownloadCompleted: ${e}`)
+                  this.handleError(callbacks, e as Error, { item, event, webContents })
+                }
+              }
+              this.cleanup(item)
+            } else {
+              item.on('updated', updatedHandler)
+              item.once('done', doneHandler)
+            }
             item.resume()
           } else if (item.getState() === 'cancelled') {
             clearInterval(interval)
