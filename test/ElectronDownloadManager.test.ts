@@ -150,7 +150,11 @@ describe('ElectronMultiDownloader', () => {
       saveAsFilename: '/tmp/testFile.txt',
     };
     // Manually setting up for simulation
-    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+    // @ts-ignore
+    instance['idToCallbackData'][id] = {
+      id,
+      item: downloadItem as DownloadItem
+    };
 
     instance.cancelDownload(id);
     expect(downloadItem.cancel).toHaveBeenCalled();
@@ -160,7 +164,11 @@ describe('ElectronMultiDownloader', () => {
     const id = 'test-download-id';
     downloadItem.isPaused.mockImplementationOnce(() => false);
     // Manually setting up for simulation
-    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+    // @ts-ignore
+    instance['idToCallbackData'][id] = {
+      id,
+      item: downloadItem as DownloadItem
+    };
 
     instance.pauseDownload(id);
     expect(downloadItem.pause).toHaveBeenCalled();
@@ -170,7 +178,11 @@ describe('ElectronMultiDownloader', () => {
     const id = 'test-download-id';
     downloadItem.isPaused.mockImplementationOnce(() => true);
     // Manually setting up for simulation
-    instance['idToDownloadItems'][id] = downloadItem as DownloadItem;
+    // @ts-ignore
+    instance['idToCallbackData'][id] = {
+      id,
+      item: downloadItem as DownloadItem
+    };
 
     instance.resumeDownload(id);
     expect(downloadItem.resume).toHaveBeenCalled();

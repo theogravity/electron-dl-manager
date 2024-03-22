@@ -1,3 +1,7 @@
+# 1.2.2 (2024-03-21)
+
+- Internal refactors and small fixes
+
 # 1.2.1 (2024-03-21)
 
 - More immediate download fixes

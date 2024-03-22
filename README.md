@@ -97,6 +97,13 @@ ipcMain.handle('download-file', async (event, args) => {
   downloadId = manager.download({
     window: browserWindow,
     url,
+    // If you want to download without a save as dialog
+    saveAsFilename: 'file.zip',
+    directory: '/directory/where/to/save',
+    // If you want to download with a save as dialog
+    saveDialogOptions: {
+      title: 'Save File',
+    },
     callbacks: {
       // item is an instance of Electron.DownloadItem
       onDownloadStarted: async ({ id, item, resolvedFilename }) => {
