@@ -216,8 +216,11 @@ interface DownloadParams {
   /**
    * If true, will show a badge on the dock icon when the download is in progress
    * under MacOS and linux.
+   * 
+   * On macOS, you need to ensure that your application has the permission to display notifications for this method to work.
    *
    * @default false
+   * @see https://www.electronjs.org/docs/latest/api/app#appsetbadgecountcount-linux-macos
    */
   showBadge?: boolean
 }
@@ -250,6 +253,10 @@ interface DownloadManagerItem {
    * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
    */
   resolvedFilename: string
+  /**
+   * If true, the download was cancelled from the save as dialog
+   */
+  cancelledFromSaveAsDialog?: boolean
 }
 
 interface DownloadManagerCallbackData extends DownloadManagerItem {

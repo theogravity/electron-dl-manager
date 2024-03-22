@@ -25,10 +25,6 @@ interface ItemHandlerParams {
   showBadge?: boolean
 }
 
-function tId(id: string) {
-  return id.slice(0, 5)
-}
-
 function tUrl(url: string) {
   if (url.length > 50) {
     return url.slice(0, 50) + '...'
@@ -44,7 +40,7 @@ function generateRandomId() {
   const hash = crypto.createHash('sha256')
   hash.update(combinedValue)
 
-  return hash.digest('hex').substring(0, 12)
+  return hash.digest('hex').substring(0, 6)
 }
 
 // Copied from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L10
@@ -101,7 +97,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
     const id = generateRandomId()
 
-    this.log(`Registering download for url: ${tUrl(params.url)}`)
+    this.log(`[${id}] Registering download for url: ${tUrl(params.url)}`)
     params.window.webContents.session.once('will-download', this.onWillDownload(id, params))
     params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
 
@@ -115,10 +111,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     const item = this.idToDownloadItems[id]
 
     if (item) {
-      this.log(`[${tId(id)}] Cancelling download`)
+      this.log(`[${id}] Cancelling download`)
       item.cancel()
     } else {
-      this.log(`[${tId(id)}] Download ${id} not found for cancellation`)
+      this.log(`[${id}] Download ${id} not found for cancellation`)
     }
   }
 
@@ -129,10 +125,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     const item = this.idToDownloadItems[id]
 
     if (item) {
-      this.log(`[${tId(id)}] Pausing download`)
+      this.log(`[${id}] Pausing download`)
       item.pause()
     } else {
-      this.log(`[${tId(id)}] Download ${id} not found for pausing`)
+      this.log(`[${id}] Download ${id} not found for pausing`)
     }
   }
 
@@ -143,10 +139,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     const item = this.idToDownloadItems[id]
 
     if (item && item.isPaused()) {
-      this.log(`[${tId(id)}] Resuming download`)
+      this.log(`[${id}] Resuming download`)
       item.resume()
     } else {
-      this.log(`[${tId(id)}] Download ${id} not found or is not in a paused state`)
+      this.log(`[${id}] Download ${id} not found or is not in a paused state`)
     }
   }
 
@@ -225,6 +221,29 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     { window, directory, overwrite, saveAsFilename, callbacks, saveDialogOptions, showBadge }: DownloadParams
   ) {
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
+      item.pause()
+
+      const cancel = async () => {
+        item.cancel()
+        if (callbacks.onDownloadCancelled) {
+          this.log(`[${id}] Calling onDownloadCancelled`)
+
+          try {
+            await callbacks.onDownloadCancelled({
+              id,
+              item,
+              event,
+              webContents,
+              percentCompleted: 0,
+              resolvedFilename: item.getFilename(),
+              cancelledFromSaveAsDialog: true,
+            })
+          } catch (e) {
+            this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
+            this.handleError(callbacks, e as Error, { id, item, event, webContents, cancelledFromSaveAsDialog: true })
+          }
+        }
+      }
       // Begin adapted code from
       // https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
 
@@ -245,26 +264,24 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       }
 
       if (saveDialogOptions) {
-        this.log(`Prompting save as dialog`)
-        item.pause()
-
+        this.log(`[${id}] Prompting save as dialog`)
         let result
 
         try {
           result = await dialog.showSaveDialog(window, { defaultPath: filePath, ...saveDialogOptions })
         } catch (e) {
-          this.log(`Error while showing save dialog: ${e}`)
+          this.log(`[${id}] Error while showing save dialog: ${e}`)
           this.handleError(callbacks, e as Error, { item, event, webContents })
-          item.cancel()
+          await cancel()
           return
         }
 
         if (result.canceled) {
-          item.cancel()
+          this.log(`[${id}] User cancelled save as dialog`)
+          await cancel()
           return
         } else {
           item.setSavePath(result.filePath!)
-          item.resume()
         }
       } else {
         this.log(`Setting save path to ${filePath}`)
@@ -275,49 +292,45 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
       const resolvedFilename = path.basename(item.getSavePath()) || item.getFilename()
 
-      this.log(`[${tId(id)}] Associating ${id} to ${resolvedFilename}`)
-      this.log(`[${tId(id)}] Initiating download item handlers`)
+      this.log(`[${id}] Associating ${id} to ${resolvedFilename}`)
+      this.log(`[${id}] Initiating download item handlers`)
 
-      this.downloadItems.set(item, {
+      const downloadData = {
         id,
         percentCompleted: 0,
         resolvedFilename,
-      })
+      }
+
+      this.downloadItems.set(item, downloadData)
 
       this.idToDownloadItems[id] = item
 
-      if (callbacks.onDownloadStarted && this.downloadItems.has(item)) {
-        this.log(`[${tId(id)}] Calling onDownloadStarted`)
+      if (callbacks.onDownloadStarted) {
+        this.log(`[${id}] Calling onDownloadStarted`)
         try {
           await callbacks.onDownloadStarted({
-            ...this.downloadItems.get(item)!,
+            ...downloadData,
             item,
             event,
             webContents,
           })
         } catch (e) {
-          this.log(`[${tId(id)}] Error during onDownloadStarted: ${e}`)
-          this.handleError(callbacks, e as Error, { item, event, webContents })
+          this.log(`[${id}] Error during onDownloadStarted: ${e}`)
+          this.handleError(callbacks, e as Error, { id, item, event, webContents })
         }
       }
 
-      const updatedHandler = this.itemOnUpdated({
+      const handlerConfig = {
         id,
         event,
         item,
         webContents,
         callbacks,
         showBadge,
-      })
+      }
 
-      const doneHandler = this.itemOnDone({
-        id,
-        event,
-        item,
-        webContents,
-        callbacks,
-        showBadge,
-      })
+      const updatedHandler = this.itemOnUpdated(handlerConfig)
+      const doneHandler = this.itemOnDone(handlerConfig)
 
       this.listeners.set(item, {
         id,
@@ -327,6 +340,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
       item.on('updated', updatedHandler)
       item.once('done', doneHandler)
+      item.resume()
     }
   }
 
@@ -337,7 +351,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
           this.updateProgress(item)
           if (callbacks.onDownloadProgress && this.downloadItems.has(item)) {
             const data = this.downloadItems.get(item)!
-            this.log(`[${tId(id)}] Calling onDownloadProgress ${data.percentCompleted}%`)
+            this.log(`[${id}] Calling onDownloadProgress ${data.percentCompleted}%`)
 
             try {
               await callbacks.onDownloadProgress({
@@ -347,7 +361,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 webContents,
               })
             } catch (e) {
-              this.log(`[${tId(id)}] Error during onDownloadProgress: ${e}`)
+              this.log(`[${id}] Error during onDownloadProgress: ${e}`)
               this.handleError(callbacks, e as Error, { item, event, webContents, ...data })
             }
           }
@@ -355,7 +369,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         }
         case 'interrupted': {
           if (callbacks.onDownloadInterrupted && this.downloadItems.has(item)) {
-            this.log(`[${tId(id)}] Calling onDownloadInterrupted`)
+            this.log(`[${id}] Calling onDownloadInterrupted`)
 
             try {
               await callbacks.onDownloadInterrupted({
@@ -365,12 +379,14 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 webContents,
               })
             } catch (e) {
-              this.log(`[${tId(id)}] Error during onDownloadInterrupted: ${e}`)
+              this.log(`[${id}] Error during onDownloadInterrupted: ${e}`)
               this.handleError(callbacks, e as Error, { item, event, webContents })
             }
           }
           break
         }
+        default:
+          this.log(`[${id}] Unexpected itemOnUpdated state: ${state}`)
       }
 
       if (showBadge) {
@@ -384,7 +400,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       switch (state) {
         case 'completed': {
           if (callbacks.onDownloadCompleted && this.downloadItems.has(item)) {
-            this.log(`[${tId(id)}] Calling onDownloadCompleted`)
+            this.log(`[${id}] Calling onDownloadCompleted`)
 
             try {
               await callbacks.onDownloadCompleted({
@@ -394,7 +410,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 webContents,
               })
             } catch (e) {
-              this.log(`[${tId(id)}] Error during onDownloadCompleted: ${e}`)
+              this.log(`[${id}] Error during onDownloadCompleted: ${e}`)
               this.handleError(callbacks, e as Error, { item, event, webContents })
             }
           }
@@ -402,7 +418,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
         }
         case 'cancelled':
           if (callbacks.onDownloadCancelled && this.downloadItems.has(item)) {
-            this.log(`[${tId(id)}] Calling onDownloadCancelled`)
+            this.log(`[${id}] Calling onDownloadCancelled`)
 
             try {
               await callbacks.onDownloadCancelled({
@@ -412,11 +428,13 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 webContents,
               })
             } catch (e) {
-              this.log(`[${tId(id)}] Error during onDownloadCancelled: ${e}`)
+              this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
               this.handleError(callbacks, e as Error, { item, event, webContents })
             }
           }
           break
+        default:
+          this.log(`[${id}] Unexpected itemOnDone state: ${state}`)
       }
 
       if (showBadge) {
@@ -439,7 +457,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     const listeners = this.listeners.get(item)
 
     if (listeners) {
-      this.log(`[${tId(listeners.id)}] Cleaning up`)
+      this.log(`[${listeners.id}] Cleaning up`)
       item.removeListener('updated', listeners.updated)
       item.removeListener('done', listeners.done)
       delete this.idToDownloadItems[listeners.id]

@@ -1,3 +1,9 @@
+# 1.1.1 (2024-03-21)
+
+- Fix issues around downloading smaller files where the download would complete before the progress / completed event was emitted
+- When the user cancels from the save as dialog, will fire out `onDownloadCancelled()` 
+- Add `cancelledFromSaveAsDialog` in the callback data to indicate if the download was cancelled from the save as dialog
+
 # 1.1.0 (2024-03-21)
 
 - Add `ElectronDownloadManagerMock` for use in tests
