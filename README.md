@@ -230,12 +230,38 @@ interface DownloadParams {
 
 ```typescript
 interface DownloadManagerCallbacks {
+  /**
+   * When the download has started. When using a "save as" dialog,
+   * this will be called after the user has selected a location.
+   *
+   * This will always be called first before the progress and completed events.
+   */
   onDownloadStarted: (data: DownloadManagerCallbackData) => void
+  /**
+   * When there is a progress update on a download. Note: This
+   * may be skipped entirely in some cases, where the download
+   * completes immediately. In that case, onDownloadCompleted
+   * will be called instead.
+   */
   onDownloadProgress: (data: DownloadManagerCallbackData) => void
+  /**
+   * When the download has completed
+   */
   onDownloadCompleted: (data: DownloadManagerCallbackData) => void
+  /**
+   * When the download has been cancelled. Also called if the user cancels
+   * from the save as dialog.
+   */
   onDownloadCancelled: (data: DownloadManagerCallbackData) => void
+  /**
+   * When the download has been interrupted. This could be due to a bad
+   * connection, the server going down, etc.
+   */
   onDownloadInterrupted: (data: DownloadManagerCallbackData) => void
-  // Note: data may be undefined or be incomplete
+  /**
+   * When an error has been encountered.
+   * Note: The signature is (error, <maybe some data>).
+   */
   onError: (error: Error, data?: Partial<DownloadManagerCallbackData>) => void
 }
 

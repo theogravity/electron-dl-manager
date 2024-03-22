@@ -1,3 +1,7 @@
+# 1.2.1 (2024-03-21)
+
+- More immediate download fixes
+
 # 1.2.0 (2024-03-21)
 
 - Fixes a major issue where a download would not complete if using the save as dialog
