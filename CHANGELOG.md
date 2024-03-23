@@ -1,3 +1,14 @@
+# 2.0.0 (2024-03-22)
+
+Complete refactor to make things more organized and readable. Unit tests are more
+sane now.
+
+**Breaking Changes:**
+
+- `showBadge` option has been removed. The reasoning is that you may have other items that you need to include in your badge count outside of download counts, so it's better to manage that aspect yourself.
+
+- The callbacks return a `DownloadData` instance instead of a plain object. The data sent is the same as it was in v1.
+
 # 1.2.2 (2024-03-21)
 
 - Internal refactors and small fixes

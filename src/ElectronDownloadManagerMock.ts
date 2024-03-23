@@ -1,13 +1,14 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { DownloadParams, IElectronDownloadManager } from './types'
+import { DownloadConfig, IElectronDownloadManager } from './types'
+import { DownloadData } from './DownloadData'
 
 /**
  * Mock version of ElectronDownloadManager
  * that can be used for testing purposes
  */
 export class ElectronDownloadManagerMock implements IElectronDownloadManager {
-  download(_params: DownloadParams): string {
+  download(_params: DownloadConfig): string {
     return 'mock-download-id'
   }
 
@@ -19,5 +20,11 @@ export class ElectronDownloadManagerMock implements IElectronDownloadManager {
 
   getActiveDownloadCount(): number {
     return 0
+  }
+
+  getDownloadData(id: string) {
+    const downloadData = new DownloadData()
+    downloadData.id = id
+    return downloadData
   }
 }

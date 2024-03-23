@@ -1,73 +1,41 @@
-import type { DownloadItem, SaveDialogOptions, WebContents, Event, BrowserWindow } from 'electron'
-
-export interface DownloadManagerItem {
-  /**
-   * Generated id for the download
-   */
-  id: string
-  /**
-   * The percentage of the download that has been completed
-   */
-  percentCompleted: number
-  /**
-   * The name of the file that is being saved to the user's computer.
-   * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
-   */
-  resolvedFilename: string
-  /**
-   * If true, the download was cancelled from the save as dialog
-   */
-  cancelledFromSaveAsDialog?: boolean
-}
-
-export interface DownloadManagerCallbackData extends DownloadManagerItem {
-  /**
-   * The Electron.DownloadItem. Use this to grab the filename, path, etc.
-   * @see https://www.electronjs.org/docs/latest/api/download-item
-   */
-  item: DownloadItem
-  /**
-   * The Electron.WebContents
-   * @see https://www.electronjs.org/docs/latest/api/web-contents
-   */
-  webContents: WebContents
-  /**
-   * The Electron.Event
-   * @see https://www.electronjs.org/docs/latest/api/event
-   */
-  event: Event
-}
+import type { SaveDialogOptions, BrowserWindow } from 'electron'
+import { DownloadData } from './DownloadData'
 
 /**
  * The download has started
  */
-export type DownloadStartedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+export type DownloadStartedFn = (data: DownloadData) => Promise<void> | void
 /**
  * There is progress on the download
  */
-export type DownloadProgressFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+export type DownloadProgressFn = (data: DownloadData) => Promise<void> | void
 /**
  * The download has been cancelled
  */
-export type DownloadCancelledFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+export type DownloadCancelledFn = (data: DownloadData) => Promise<void> | void
 /**
  * The download has completed
  */
-export type DownloadCompletedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+export type DownloadCompletedFn = (data: DownloadData) => Promise<void> | void
 /**
  * The download was interrupted
  */
-export type DownloadInterruptedFn = (data: DownloadManagerCallbackData) => Promise<void> | void
+export type DownloadInterruptedFn = (data: DownloadData) => Promise<void> | void
 /**
  * The download has failed
  */
-export type ErrorFn = (error: Error, data?: Partial<DownloadManagerCallbackData>) => Promise<void> | void
+export type ErrorFn = (error: Error, data?: DownloadData) => Promise<void> | void
+
+/**
+ * Function for logging internal debug messages
+ */
+export type DebugLoggerFn = (message: string) => void
 
 export interface DownloadManagerConstructorParams {
   /**
    * If defined, will log out internal debug messages
    */
-  debugLogger?: (message: string) => void
+  debugLogger?: DebugLoggerFn
 }
 
 export interface DownloadManagerCallbacks {
@@ -106,7 +74,7 @@ export interface DownloadManagerCallbacks {
   onError?: ErrorFn
 }
 
-export interface DownloadParams {
+export interface DownloadConfig {
   /**
    * The Electron.BrowserWindow instance
    */
@@ -149,16 +117,6 @@ export interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
-  /**
-   * If true, will show a badge on the dock icon when the download is in progress
-   * under MacOS and linux.
-   *
-   * On macOS, you need to ensure that your application has the permission to display notifications for this method to work.
-   *
-   * @default false
-   * @see https://www.electronjs.org/docs/latest/api/app#appsetbadgecountcount-linux-macos
-   */
-  showBadge?: boolean
 }
 
 export interface IElectronDownloadManager {
@@ -168,7 +126,7 @@ export interface IElectronDownloadManager {
    *
    * Returns the id of the download.
    */
-  download(params: DownloadParams): string
+  download(params: DownloadConfig): string
   /**
    * Cancels a download
    */
@@ -185,4 +143,8 @@ export interface IElectronDownloadManager {
    * Returns the number of active downloads
    */
   getActiveDownloadCount(): number
+  /**
+   * Returns the data for a download
+   */
+  getDownloadData(id: string): DownloadData | undefined
 }

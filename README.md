@@ -50,6 +50,7 @@ manager.resumeDownload(id);
 
 # Table of Contents
 
+- [Electron File Download Manager](#electron-file-download-manager)
 - [Installation](#installation)
 - [Getting started](#getting-started)
 - [API](#api)
@@ -62,6 +63,15 @@ manager.resumeDownload(id);
     + [`pauseDownload()`](#-pausedownload---)
     + [`resumeDownload()`](#-resumedownload---)
     + [`getActiveDownloadCount()`](#-getactivedownloadcount---)
+    + [`getDownloadData()`](#-getdownloaddata---)
+- [Class: `DownloadData`](#class---downloaddata-)
+  * [Properties](#properties)
+  * [`isDownloadInProgress()`](#-isdownloadinprogress---)
+  * [`isDownloadPaused()`](#-isdownloadpaused---)
+  * [`isDownloadCancelled()`](#-isdownloadcancelled---)
+  * [`isDownloadInterrupted()`](#-isdownloadinterrupted---)
+  * [`isDownloadCompleted()`](#-isdownloadcompleted---)
+- [Mock class](#mock-class)
 - [Acknowledgments](#acknowledgments)
 
 # Installation
@@ -220,16 +230,6 @@ interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
-  /**
-   * If true, will show a badge on the dock icon when the download is in progress
-   * under MacOS and linux.
-   * 
-   * On macOS, you need to ensure that your application has the permission to display notifications for this method to work.
-   *
-   * @default false
-   * @see https://www.electronjs.org/docs/latest/api/app#appsetbadgecountcount-linux-macos
-   */
-  showBadge?: boolean
 }
 ```
 
@@ -243,71 +243,33 @@ interface DownloadManagerCallbacks {
    *
    * This will always be called first before the progress and completed events.
    */
-  onDownloadStarted: (data: DownloadManagerCallbackData) => void
+  onDownloadStarted: (data: DownloadData) => void
   /**
    * When there is a progress update on a download. Note: This
    * may be skipped entirely in some cases, where the download
    * completes immediately. In that case, onDownloadCompleted
    * will be called instead.
    */
-  onDownloadProgress: (data: DownloadManagerCallbackData) => void
+  onDownloadProgress: (data: DownloadData) => void
   /**
    * When the download has completed
    */
-  onDownloadCompleted: (data: DownloadManagerCallbackData) => void
+  onDownloadCompleted: (data: DownloadData) => void
   /**
    * When the download has been cancelled. Also called if the user cancels
    * from the save as dialog.
    */
-  onDownloadCancelled: (data: DownloadManagerCallbackData) => void
+  onDownloadCancelled: (data: DownloadData) => void
   /**
    * When the download has been interrupted. This could be due to a bad
    * connection, the server going down, etc.
    */
-  onDownloadInterrupted: (data: DownloadManagerCallbackData) => void
+  onDownloadInterrupted: (data: DownloadData) => void
   /**
    * When an error has been encountered.
    * Note: The signature is (error, <maybe some data>).
    */
-  onError: (error: Error, data?: Partial<DownloadManagerCallbackData>) => void
-}
-
-interface DownloadManagerItem {
-  /**
-   * Generated id for the download
-   */
-  id: string
-  /**
-   * The percentage of the download that has been completed
-   */
-  percentCompleted: number
-  /**
-   * The name of the file that is being saved to the user's computer.
-   * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
-   */
-  resolvedFilename: string
-  /**
-   * If true, the download was cancelled from the save as dialog
-   */
-  cancelledFromSaveAsDialog?: boolean
-}
-
-interface DownloadManagerCallbackData extends DownloadManagerItem {
-  /**
-   * The Electron.DownloadItem. Use this to grab the filename, path, etc.
-   * @see https://www.electronjs.org/docs/latest/api/download-item
-   */
-  item: DownloadItem
-  /**
-   * The Electron.WebContents
-   * @see https://www.electronjs.org/docs/latest/api/web-contents
-   */
-  webContents: WebContents
-  /**
-   * The Electron.Event
-   * @see https://www.electronjs.org/docs/latest/api/event
-   */
-  event: Event
+  onError: (error: Error, data?: DownloadData) => void
 }
 ```
 
@@ -343,13 +305,100 @@ Returns the number of active downloads.
 getActiveDownloadCount(): number
 ```
 
+### `getDownloadData()`
+
+Returns the download data for a download.
+
+```typescript
+getDownloadData(id: string): DownloadData
+```
+
+# Class: `DownloadData`
+
+Data returned in the callbacks for a download.
+
+## Properties
+
+```typescript
+  /**
+ * Generated id for the download
+ */
+id: string
+/**
+ * The Electron.DownloadItem. Use this to grab the filename, path, etc.
+ * @see https://www.electronjs.org/docs/latest/api/download-item
+ */
+item: DownloadItem
+/**
+ * The Electron.WebContents
+ * @see https://www.electronjs.org/docs/latest/api/web-contents
+ */
+webContents: WebContents
+/**
+ * The Electron.Event
+ * @see https://www.electronjs.org/docs/latest/api/event
+ */
+event: Event
+/**
+ * The name of the file that is being saved to the user's computer.
+ * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
+ */
+resolvedFilename: string
+/**
+ * The percentage of the download that has been completed
+ */
+percentCompleted: number
+/**
+ * If true, the download was cancelled from the save as dialog
+ */
+cancelledFromSaveAsDialog?: boolean
+```
+
+## `isDownloadInProgress()`
+
+Returns true if the download is in progress.
+
+```typescript
+isDownloadInProgress(): boolean
+```
+
+## `isDownloadPaused()`
+
+Returns true if the download is paused.
+
+```typescript
+isDownloadPaused(): boolean
+```
+
+## `isDownloadCancelled()`
+
+Returns true if the download is cancelled.
+
+```typescript 
+isDownloadCancelled(): boolean
+```
+
+## `isDownloadInterrupted()`
+
+Returns true if the download is interrupted.
+
+```typescript
+isDownloadInterrupted(): boolean
+```
+
+## `isDownloadCompleted()`
+
+Returns true if the download is completed.
+
+```typescript
+isDownloadCompleted(): boolean
+```
+
 # Mock class
 
 If you need to mock out `ElectronDownloadManager` in your tests, you can use the `ElectronDownloadManagerMock` class.
 
 `import { ElectronDownloadManagerMock } from 'electron-dl-manager'`
-
-```typescript
 
 # Acknowledgments
 
