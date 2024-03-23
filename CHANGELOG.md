@@ -1,3 +1,7 @@
+# 2.0.2 (2024-03-22)
+
+- Fix bug where `cancelledFromSaveAsDialog` was not being set if the user cancelled from the save as dialog
+
 # 2.0.1 (2024-03-22)
 
 Fix the TOC in the readme.

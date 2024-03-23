@@ -121,10 +121,10 @@ export class DownloadInitiator {
    */
   protected initSaveAsInteractiveDownload() {
     this.log(`Prompting save as dialog`)
-    const { directory, saveAsFilename, overwrite, saveDialogOptions } = this.config
+    const { directory, overwrite, saveDialogOptions } = this.config
     const { item } = this.downloadData
 
-    const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite })
+    const filePath = determineFilePath({ directory, item, overwrite })
 
     // This actually isn't what shows the save dialog
     // If item.setSavePath() isn't called at all after some tiny period of time,
@@ -161,6 +161,7 @@ export class DownloadInitiator {
       } else if (this.downloadData.isDownloadCancelled()) {
         clearInterval(interval)
         this.log(`Download was cancelled by user`)
+        this.downloadData.cancelledFromSaveAsDialog = true
         await this.callbackDispatcher.onDownloadCancelled(this.downloadData)
       } else {
         this.log(`Waiting for save path to be chosen by user`)

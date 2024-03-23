@@ -73,6 +73,7 @@ describe('DownloadInitiator', () => {
       await jest.runAllTimersAsync()
 
       expect(downloadInitiator['callbackDispatcher'].onDownloadCancelled).toHaveBeenCalled()
+      expect(mockDownloadData.cancelledFromSaveAsDialog).toBe(true)
     })
 
     describe('path was set', () => {
