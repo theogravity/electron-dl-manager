@@ -1,117 +1,131 @@
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from 'electron'
-import {
-  DownloadManagerCallbackData,
-  DownloadManagerCallbacks,
-  DownloadManagerConstructorParams,
-  DownloadParams,
-} from './types'
+import { DownloadConfig, DownloadManagerCallbacks } from './types'
 import * as path from 'path'
 import { determineFilePath } from './utils'
-
-interface ItemHandlerParams {
-  id: string
-  event: Event
-  item: DownloadItem
-  webContents: WebContents
-  callbacks: DownloadManagerCallbacks
-  showBadge?: boolean
-}
-
-interface InitNonInteractiveDownloadParams {
-  id: string
-  filePath: string
-  event: Event
-  item: DownloadItem
-  webContents: WebContents
-  callbacks: DownloadManagerCallbacks
-  showBadge?: boolean
-}
-
-interface InitSaveAsInteractiveDownloadParams extends InitNonInteractiveDownloadParams {
-  saveDialogOptions?: SaveDialogOptions
-}
+import { DownloadData } from './DownloadData'
+import { CallbackDispatcher } from './CallbackDispatcher'
 
 interface DownloadInitiatorConstructorParams {
   debugLogger?: (message: string) => void
-  onCallbackData: (data: DownloadManagerCallbackData) => void
-  onDownloadCompleted: (data: DownloadManagerCallbackData) => void
-  onStatusUpdated: (data: DownloadManagerCallbackData) => void
-  callbackData: DownloadManagerCallbackData
+  onCleanup?: (id: DownloadData) => void
+}
+
+interface WillOnDownloadParams {
+  /**
+   * The callbacks to define to listen for download events
+   */
+  callbacks: DownloadManagerCallbacks
+  /**
+   * If defined, will show a save dialog when the user
+   * downloads a file.
+   *
+   * @see https://www.electronjs.org/docs/latest/api/dialog#dialogshowsavedialogbrowserwindow-options
+   */
+  saveDialogOptions?: SaveDialogOptions
+  /**
+   * The filename to save the file as. If not defined, the filename
+   * from the server will be used.
+   *
+   * Only applies if saveDialogOptions is not defined.
+   */
+  saveAsFilename?: string
+  /**
+   * The directory to save the file to. Must be an absolute path.
+   * @default The user's downloads directory
+   */
+  directory?: string
+  /**
+   * If true, will overwrite the file if it already exists
+   * @default false
+   */
+  overwrite?: boolean
 }
 
 export class DownloadInitiator {
   protected logger: (message: string) => void
-  protected onCallbackData: (data: DownloadManagerCallbackData) => void
-  protected onDownloadCompleted: (data: DownloadManagerCallbackData) => void
+  /**
+   * The handler for the DownloadItem's `updated` event.
+   */
   private onItemUpdated: (event: Event, state: 'progressing' | 'interrupted') => Promise<void>
+  /**
+   * The handler for the DownloadItem's `done` event.
+   */
   private onItemDone: (event: Event, state: 'completed' | 'cancelled' | 'interrupted') => Promise<void>
-  protected callbackData: DownloadManagerCallbackData
+  /**
+   * When cleanup is called
+   */
+  private onCleanup: (data: DownloadData) => void
+  /**
+   * The callback dispatcher for handling download events.
+   */
+  private callbackDispatcher: CallbackDispatcher
+  /**
+   * The data for the download.
+   */
+  private downloadData: DownloadData
+  private config: Omit<WillOnDownloadParams, 'callbacks'>
 
-  constructor(params: DownloadInitiatorConstructorParams) {
-    this.logger = params.debugLogger || (() => {})
-    this.onCallbackData = params.onCallbackData
-    this.onDownloadCompleted = params.onDownloadCompleted
-    this.callbackData = params.callbackData
+  constructor(config: DownloadInitiatorConstructorParams) {
+    this.downloadData = new DownloadData()
+    this.logger = config.debugLogger || (() => {})
     this.onItemUpdated = () => Promise.resolve()
     this.onItemDone = () => Promise.resolve()
+    this.onCleanup = config.onCleanup || (() => {})
+    this.config = {} as DownloadConfig
+    this.callbackDispatcher = {} as CallbackDispatcher
   }
 
   protected log(message: string) {
-    this.logger(message)
+    this.logger(`[${this.downloadData.id}] ${message}`)
+  }
+
+  /**
+   * Returns the download id
+   */
+  getDownloadId(): string {
+    return this.downloadData.id
+  }
+
+  /**
+   * Returns the current download data
+   */
+  getDownloadData(): DownloadData {
+    return this.downloadData
   }
 
   /**
    * Generates the handler that attaches to the session `will-download` event,
    * which will execute the workflows for handling a download.
    */
-  protected generateOnWillDownload(id: string, downloadParams: DownloadParams) {
+  generateOnWillDownload(downloadParams: WillOnDownloadParams) {
+    this.config = downloadParams
+    this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, downloadParams.callbacks, this.logger)
+
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       item.pause()
+      this.downloadData.item = item
+      this.downloadData.webContents = webContents
+      this.downloadData.event = event
 
-      const { callbacks, directory, overwrite, saveAsFilename, saveDialogOptions, showBadge } = downloadParams
-
-      const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite })
-
-      if (saveDialogOptions) {
-        this.initSaveAsInteractiveDownload({
-          id,
-          filePath,
-          event,
-          item,
-          webContents,
-          callbacks,
-          saveDialogOptions,
-          showBadge,
-        })
+      if (this.config.saveDialogOptions) {
+        this.initSaveAsInteractiveDownload()
         return
       }
 
-      await this.initNonInteractiveDownload({
-        id,
-        filePath,
-        event,
-        item,
-        webContents,
-        callbacks,
-        showBadge,
-      })
+      await this.initNonInteractiveDownload()
     }
   }
 
   /**
    * Flow for handling a download that requires user interaction via a "Save as" dialog.
    */
-  private initSaveAsInteractiveDownload({
-    id,
-    filePath,
-    event,
-    item,
-    webContents,
-    saveDialogOptions,
-    callbacks,
-    showBadge,
-  }: InitSaveAsInteractiveDownloadParams) {
-    this.log(`[${id}] Prompting save as dialog`)
+  protected initSaveAsInteractiveDownload() {
+    this.log(`Prompting save as dialog`)
+    const { directory, saveAsFilename, overwrite, saveDialogOptions } = this.config
+    const { item } = this.downloadData
+
+    const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite })
+
     // This actually isn't what shows the save dialog
     // If item.setSavePath() isn't called at all after some tiny period of time,
     // then the save dialog will show up, and it will use the options we set it to here
@@ -129,208 +143,77 @@ export class DownloadInitiator {
       if (item.getSavePath()) {
         clearInterval(interval)
 
-        this.log(`User selected save path to ${item.getSavePath()}`)
-        this.log(`[${id}] Initiating download item handlers`)
+        this.log(`User selected save path to ${this.downloadData.item.getSavePath()}`)
+        this.log(`Initiating download item handlers`)
 
-        const callbackData: DownloadManagerCallbackData = {
-          item,
-          id,
-          event,
-          webContents,
-          resolvedFilename: path.basename(item.getSavePath()),
-          percentCompleted: 0,
-        }
+        this.downloadData.resolvedFilename = path.basename(item.getSavePath())
 
-        const downloadParams = {
-          showBadge,
-        }
-
-        this.generateDownloadItemHandlersAndCallbackData({
-          callbacks,
-          callbackData,
-          downloadParams,
-        })
-
-        await this.triggerDownloadStarted(callbacks, callbackData)
+        await this.callbackDispatcher.onDownloadStarted(this.downloadData)
         // If for some reason the above pause didn't work...
         // We'll manually call the completed handler
-        if (item.getState() === 'completed') {
-          if (callbacks.onDownloadCompleted) {
-            this.log(`[${id}] Calling onDownloadCompleted`)
-
-            try {
-              await callbacks.onDownloadCompleted({
-                id,
-                item,
-                event,
-                webContents,
-                percentCompleted: 100,
-                resolvedFilename: path.basename(item.getSavePath()),
-              })
-            } catch (e) {
-              this.log(`[${id}] Error during onDownloadCompleted: ${e}`)
-              this.handleError(callbacks, e as Error, { item, event, webContents })
-            }
-          }
-
-          this.onDownloadCompleted(callbackData)
+        if (this.downloadData.isDownloadCompleted()) {
+          await this.callbackDispatcher.onDownloadCompleted(this.downloadData)
         } else {
-          item.on('updated', this.onItemUpdated)
-          item.once('done', this.onItemDone)
+          item.on('updated', this.generateItemOnUpdated())
+          item.once('done', this.generateItemOnDone())
         }
         item.resume()
-      } else if (item.getState() === 'cancelled') {
+      } else if (this.downloadData.isDownloadCancelled()) {
         clearInterval(interval)
-        this.log(`[${id}] Download was cancelled by user`)
-        if (callbacks.onDownloadCancelled) {
-          this.log(`[${id}] Calling onDownloadCancelled`)
-
-          try {
-            await callbacks.onDownloadCancelled({
-              id,
-              item,
-              event,
-              webContents,
-              cancelledFromSaveAsDialog: true,
-              percentCompleted: 0,
-              resolvedFilename: '',
-            })
-          } catch (e) {
-            this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
-            this.handleError(callbacks, e as Error, { item, event, webContents })
-          }
-        }
+        this.log(`Download was cancelled by user`)
+        await this.callbackDispatcher.onDownloadCancelled(this.downloadData)
       } else {
-        this.log(`[${id}] Waiting for save path to be chosen by user`)
+        this.log(`Waiting for save path to be chosen by user`)
       }
-    }, 500)
+    }, 1000)
   }
 
   /**
    * Flow for handling a download that doesn't require user interaction.
    */
-  private async initNonInteractiveDownload({
-    id,
-    filePath,
-    event,
-    item,
-    webContents,
-    callbacks,
-    showBadge,
-  }: InitNonInteractiveDownloadParams) {
-    this.log(`[${id}] Setting save path to ${filePath}`)
+  protected async initNonInteractiveDownload() {
+    const { directory, saveAsFilename, overwrite } = this.config
+    const { item } = this.downloadData
+
+    const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite })
+
+    this.log(`Setting save path to ${filePath}`)
     item.setSavePath(filePath)
-    this.log(`[${id}] Initiating download item handlers`)
-    const callbackData: DownloadManagerCallbackData = {
-      item,
-      id,
-      event,
-      webContents,
-      resolvedFilename: path.basename(filePath),
-      percentCompleted: 0,
-    }
+    this.log(`Initiating download item handlers`)
 
-    const downloadParams = {
-      showBadge,
-    }
-
-    this.generateDownloadItemHandlersAndCallbackData({
-      callbacks,
-      callbackData,
-      downloadParams,
-    })
-
-    await this.triggerDownloadStarted(callbacks, callbackData)
-    item.on('updated', this.onItemUpdated)
-    item.once('done', this.onItemDone)
+    await this.callbackDispatcher.onDownloadStarted(this.downloadData)
+    item.on('updated', this.generateItemOnUpdated())
+    item.once('done', this.generateItemOnDone())
     item.resume()
   }
 
-  private async triggerDownloadStarted(callbacks: DownloadManagerCallbacks, data: DownloadManagerCallbackData) {
-    if (callbacks.onDownloadStarted) {
-      this.log(`[${data.id}] Calling onDownloadStarted`)
-      try {
-        await callbacks.onDownloadStarted(data)
-      } catch (e) {
-        this.log(`[${data.id}] Error during onDownloadStarted: ${e}`)
-        this.handleError(callbacks, e as Error, data)
-      }
+  protected updateProgress() {
+    const { item } = this.downloadData
+
+    if (item.getTotalBytes() > 0) {
+      this.downloadData.percentCompleted = parseFloat(
+        ((item.getReceivedBytes() / item.getTotalBytes()) * 100).toFixed(2)
+      )
     }
-  }
-
-  private generateDownloadItemHandlersAndCallbackData({
-    callbacks,
-    callbackData,
-    downloadParams,
-  }: {
-    callbacks: DownloadManagerCallbacks
-    callbackData: DownloadManagerCallbackData
-    downloadParams: Pick<DownloadParams, 'showBadge'>
-  }) {
-    const { id, item, event, webContents, resolvedFilename } = callbackData
-
-    const { showBadge } = downloadParams
-
-    const handlerConfig = {
-      id,
-      event,
-      item,
-      webContents,
-      callbacks,
-      showBadge,
-    }
-
-    this.onItemUpdated = this.generateItemOnUpdated(handlerConfig)
-    this.onItemDone = this.generateItemOnDone(handlerConfig)
-
-    this.onCallbackData(callbackData)
   }
 
   /**
    * Generates the handler for hooking into the DownloadItem's `updated` event.
    */
-  protected generateItemOnUpdated({ id, event, item, webContents, callbacks, showBadge }: ItemHandlerParams) {
+  protected generateItemOnUpdated() {
     return async (_event: Event, state: 'progressing' | 'interrupted') => {
-      const callbackData = this.idToCallbackData[id]
-
-      if (!callbackData) {
-        this.log(`[${id}] Callback data not found for itemOnUpdated`)
-        return
-      }
-
       switch (state) {
         case 'progressing': {
-          this.updateProgress(callbackData)
-          if (callbacks.onDownloadProgress) {
-            this.log(`[${id}] Calling onDownloadProgress ${callbackData.percentCompleted}%`)
-
-            try {
-              await callbacks.onDownloadProgress(callbackData)
-            } catch (e) {
-              this.log(`[${id}] Error during onDownloadProgress: ${e}`)
-              this.handleError(callbacks, e as Error, callbackData)
-            }
-          }
+          this.updateProgress()
+          await this.callbackDispatcher.onDownloadProgress(this.downloadData)
           break
         }
         case 'interrupted': {
-          if (callbacks.onDownloadInterrupted) {
-            this.log(`[${id}] Calling onDownloadInterrupted`)
-            try {
-              await callbacks.onDownloadInterrupted(callbackData)
-            } catch (e) {
-              this.log(`[${id}] Error during onDownloadInterrupted: ${e}`)
-              this.handleError(callbacks, e as Error, { item, event, webContents })
-            }
-          }
+          await this.callbackDispatcher.onDownloadInterrupted(this.downloadData)
           break
         }
         default:
-          this.log(`[${id}] Unexpected itemOnUpdated state: ${state}`)
-      }
-
-      if (showBadge) {
-        this.updateBadgeCount()
+          this.log(`Unexpected itemOnUpdated state: ${state}`)
       }
     }
   }
@@ -338,65 +221,34 @@ export class DownloadInitiator {
   /**
    * Generates the handler for hooking into the DownloadItem's `done` event.
    */
-  protected generateItemOnDone({ id, event, item, webContents, callbacks, showBadge }: ItemHandlerParams) {
+  protected generateItemOnDone() {
     return async (_event: Event, state: 'completed' | 'cancelled' | 'interrupted') => {
-      const callbackData = this.idToCallbackData[id]
-
-      if (!callbackData) {
-        this.log(`[${id}] Callback data not found for itemOnUpdated`)
-        return
-      }
-
       switch (state) {
         case 'completed': {
-          if (callbacks.onDownloadCompleted) {
-            this.log(`[${id}] Calling onDownloadCompleted`)
-
-            try {
-              await callbacks.onDownloadCompleted(callbackData)
-            } catch (e) {
-              this.log(`[${id}] Error during onDownloadCompleted: ${e}`)
-              this.handleError(callbacks, e as Error, callbackData)
-            }
-          }
+          await this.callbackDispatcher.onDownloadCompleted(this.downloadData)
           break
         }
         case 'cancelled':
-          if (callbacks.onDownloadCancelled) {
-            this.log(`[${id}] Calling onDownloadCancelled`)
-
-            try {
-              await callbacks.onDownloadCancelled(callbackData)
-            } catch (e) {
-              this.log(`[${id}] Error during onDownloadCancelled: ${e}`)
-              this.handleError(callbacks, e as Error, { item, event, webContents })
-            }
-          }
+          await this.callbackDispatcher.onDownloadCancelled(this.downloadData)
           break
         default:
-          this.log(`[${id}] Unexpected itemOnDone state: ${state}`)
+          this.log(`Unexpected itemOnDone state: ${state}`)
       }
 
-      if (showBadge) {
-        this.updateBadgeCount()
-      }
-
-      this.cleanup(item)
+      this.cleanup()
     }
   }
 
-  protected handleError(
-    callbacks: DownloadManagerCallbacks,
-    error: Error,
-    data?: Partial<DownloadManagerCallbackData>
-  ) {
-    if (callbacks.onError) {
-      callbacks.onError(error, data)
-    }
-  }
+  protected cleanup() {
+    const { item } = this.downloadData
 
-  protected cleanup(item: DownloadItem) {
-    item.removeListener('updated', this.onItemUpdated)
-    item.removeListener('done', this.onItemDone)
+    if (item) {
+      item.removeListener('updated', this.onItemUpdated)
+      item.removeListener('done', this.onItemDone)
+    }
+
+    if (this.onCleanup) {
+      this.onCleanup(this.downloadData)
+    }
   }
 }

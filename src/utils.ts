@@ -1,8 +1,8 @@
 import crypto from 'crypto'
 import extName from 'ext-name'
-import { app, DownloadItem } from "electron";
-import path from "path";
-import { unusedFilenameSync } from "unused-filename";
+import { app, DownloadItem } from 'electron'
+import path from 'path'
+import { unusedFilenameSync } from 'unused-filename'
 
 export function truncateUrl(url: string) {
   if (url.length > 50) {
@@ -23,7 +23,7 @@ export function generateRandomId() {
 }
 
 // Copied from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L10
-export const getFilenameFromMime = (name: string, mime: string) => {
+export function getFilenameFromMime(name: string, mime: string) {
   const extensions = extName.mime(mime)
 
   if (extensions.length !== 1) {
@@ -36,7 +36,7 @@ export const getFilenameFromMime = (name: string, mime: string) => {
 /**
  * Determines the initial file path for the download.
  */
-export const determineFilePath = ({
+export function determineFilePath({
   directory,
   saveAsFilename,
   item,
@@ -46,13 +46,13 @@ export const determineFilePath = ({
   saveAsFilename?: string
   item: DownloadItem
   overwrite?: boolean
-}) => {
+}) {
   // Code adapted from https://github.com/sindresorhus/electron-dl/blob/main/index.js#L73
   if (directory && !path.isAbsolute(directory)) {
     throw new Error('The `directory` option must be an absolute path')
   }
 
-  directory = directory || app.getPath('downloads')
+  directory = directory || app?.getPath('downloads')
 
   let filePath
   if (saveAsFilename) {

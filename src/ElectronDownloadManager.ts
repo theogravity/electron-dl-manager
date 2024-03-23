@@ -1,26 +1,18 @@
-import type { BrowserWindow, DownloadItem, Event } from 'electron'
-import { app } from 'electron'
-import {
-  DownloadManagerCallbackData,
-  DownloadManagerCallbacks,
-  DownloadManagerConstructorParams,
-  DownloadParams,
-  IElectronDownloadManager,
-} from './types'
-import { generateRandomId, truncateUrl } from './utils'
-
-type DoneEventFn = (_event: Event, state: 'completed' | 'cancelled' | 'interrupted') => Promise<void>
-type UpdatedEventFn = (_event: Event, state: 'progressing' | 'interrupted') => Promise<void>
+import type { BrowserWindow } from 'electron'
+import { DownloadManagerConstructorParams, DownloadConfig, IElectronDownloadManager, DebugLoggerFn } from './types'
+import { truncateUrl } from './utils'
+import { DownloadInitiator } from './DownloadInitiator'
+import { DownloadData } from './DownloadData'
 
 /**
  * Enables handling downloads in Electron.
  */
 export class ElectronDownloadManager implements IElectronDownloadManager {
-  protected idToCallbackData: Record<string, DownloadManagerCallbackData>
-  protected logger: (message: string) => void
+  protected downloadData: Record<string, DownloadData>
+  protected logger: DebugLoggerFn
 
   constructor(params: DownloadManagerConstructorParams = {}) {
-    this.idToCallbackData = {}
+    this.downloadData = {}
     this.logger = params.debugLogger || (() => {})
   }
 
@@ -29,10 +21,17 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   }
 
   /**
+   * Returns the current download data
+   */
+  getDownloadData(id: string): DownloadData {
+    return this.downloadData[id]
+  }
+
+  /**
    * Cancels a download
    */
   cancelDownload(id: string) {
-    const data = this.idToCallbackData[id]
+    const data = this.downloadData[id]
 
     if (data?.item) {
       this.log(`[${id}] Cancelling download`)
@@ -46,7 +45,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Pauses a download
    */
   pauseDownload(id: string) {
-    const data = this.idToCallbackData[id]
+    const data = this.downloadData[id]
 
     if (data?.item) {
       this.log(`[${id}] Pausing download`)
@@ -60,7 +59,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Resumes a download
    */
   resumeDownload(id: string) {
-    const data = this.idToCallbackData[id]
+    const data = this.downloadData[id]
 
     if (data?.item.isPaused()) {
       this.log(`[${id}] Resuming download`)
@@ -74,7 +73,44 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the number of active downloads
    */
   getActiveDownloadCount() {
-    return Object.values(this.idToCallbackData).filter(({ item }) => item.getState() === 'progressing').length
+    return Object.values(this.downloadData).filter((data) => data.isDownloadInProgress()).length
+  }
+
+  /**
+   * Starts a download. If saveDialogOptions has been defined in the config,
+   * the saveAs dialog will show up first.
+   *
+   * Returns the id of the download.
+   */
+  download(params: DownloadConfig) {
+    if (!params.saveAsFilename && !params.saveDialogOptions) {
+      throw new Error('You must define either saveAsFilename or saveDialogOptions to start a download')
+    }
+
+    if (params.saveAsFilename && params.saveDialogOptions) {
+      throw new Error('You cannot define both saveAsFilename and saveDialogOptions to start a download')
+    }
+
+    const downloadInitiator = new DownloadInitiator({
+      debugLogger: this.logger,
+      onCleanup: (data) => {
+        this.cleanup(data)
+      },
+    })
+
+    this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`)
+    params.window.webContents.session.once('will-download', downloadInitiator.generateOnWillDownload(params))
+    params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
+
+    const downloadId = downloadInitiator.getDownloadId()
+
+    this.downloadData[downloadId] = downloadInitiator.getDownloadData()
+
+    return downloadId
+  }
+
+  protected cleanup(data: DownloadData) {
+    delete this.downloadData[data.id]
   }
 
   /**
@@ -118,50 +154,5 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       latency: 0,
     })
     dbg.detach()
-  }
-
-  protected updateBadgeCount() {
-    if (process.platform === 'darwin' || process.platform === 'linux') {
-      app.setBadgeCount(this.getActiveDownloadCount())
-    }
-  }
-
-  /**
-   * Starts a download. If saveDialogOptions has been defined in the config,
-   * the saveAs dialog will show up first.
-   *
-   * Returns the id of the download.
-   */
-  download(params: DownloadParams) {
-    if (!params.saveAsFilename && !params.saveDialogOptions) {
-      throw new Error('You must define either saveAsFilename or saveDialogOptions to start a download')
-    }
-
-    if (params.saveAsFilename && params.saveDialogOptions) {
-      throw new Error('You cannot define both saveAsFilename and saveDialogOptions to start a download')
-    }
-
-    const id = generateRandomId()
-
-    this.log(`[${id}] Registering download for url: ${truncateUrl(params.url)}`)
-    params.window.webContents.session.once('will-download', this.generateOnWillDownload(id, params))
-    params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
-
-    return id
-  }
-
-  protected updateProgress(data: DownloadManagerCallbackData): void {
-    if (data) {
-      data.percentCompleted = parseFloat(((data.item.getReceivedBytes() / data.item.getTotalBytes()) * 100).toFixed(2))
-    }
-  }
-
-  protected cleanup(item: DownloadItem) {
-    const listeners = this.listeners.get(item)
-
-    if (listeners) {
-      this.log(`[${listeners.id}] Cleaning up`)
-      delete this.idToCallbackData[listeners.id]
-    }
   }
 }

@@ -13,5 +13,10 @@ module.exports = {
     'ts-jest': {
       tsconfig: 'tsconfig.json'
     }
+  },
+  testEnvironment: "node",
+  moduleNameMapper: {
+    'electron': '<rootDir>/__mocks__/electron.js',
+    'unused-filename': '<rootDir>/__mocks__/unused-filename.js',
   }
 }
