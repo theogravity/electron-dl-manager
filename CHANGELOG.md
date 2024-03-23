@@ -1,3 +1,7 @@
+# 2.0.1 (2024-03-22)
+
+Fix the TOC in the readme.
+
 # 2.0.0 (2024-03-22)
 
 Complete refactor to make things more organized and readable. Unit tests are more

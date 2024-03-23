@@ -2,8 +2,8 @@
 
 [![NPM version](https://img.shields.io/npm/v/electron-dl-manager.svg?style=flat-square)](https://www.npmjs.com/package/electron-dl-manager) [![TypeScript](https://img.shields.io/badge/%3C%2F%3E-TypeScript-%230074c1.svg)](http://www.typescriptlang.org/)
 
-A simple and easy to use file download manager for Electron applications. 
-Designed in response to the many issues around `electron-dl` and provides 
+A simple and easy to use file download manager for Electron applications.
+Designed in response to the many issues around `electron-dl` and provides
 a more robust and reliable solution for downloading files in Electron.
 
 Use cases:
@@ -48,29 +48,30 @@ manager.pauseDownload(id);
 manager.resumeDownload(id);
 ```
 
-# Table of Contents
+# Table of contents
 
 - [Electron File Download Manager](#electron-file-download-manager)
+- [Table of Contents](#table-of-contents)
 - [Installation](#installation)
 - [Getting started](#getting-started)
 - [API](#api)
-  * [Class: `FileDownloadManager`](#class---filedownloadmanager-)
-    + [`constructor()`](#-constructor---)
-    + [`download()`](#-download---)
-      - [Interface: `DownloadParams`](#interface---downloadparams-)
-      - [Interface: `DownloadManagerCallbacks`](#interface---downloadmanagercallbacks-)
-    + [`cancelDownload()`](#-canceldownload---)
-    + [`pauseDownload()`](#-pausedownload---)
-    + [`resumeDownload()`](#-resumedownload---)
-    + [`getActiveDownloadCount()`](#-getactivedownloadcount---)
-    + [`getDownloadData()`](#-getdownloaddata---)
-- [Class: `DownloadData`](#class---downloaddata-)
-  * [Properties](#properties)
-  * [`isDownloadInProgress()`](#-isdownloadinprogress---)
-  * [`isDownloadPaused()`](#-isdownloadpaused---)
-  * [`isDownloadCancelled()`](#-isdownloadcancelled---)
-  * [`isDownloadInterrupted()`](#-isdownloadinterrupted---)
-  * [`isDownloadCompleted()`](#-isdownloadcompleted---)
+  - [Class: `FileDownloadManager`](#class-filedownloadmanager)
+    - [`constructor()`](#constructor)
+    - [`download()`](#download)
+      - [Interface: `DownloadParams`](#interface-downloadparams)
+      - [Interface: `DownloadManagerCallbacks`](#interface-downloadmanagercallbacks)
+    - [`cancelDownload()`](#canceldownload)
+    - [`pauseDownload()`](#pausedownload)
+    - [`resumeDownload()`](#resumedownload)
+    - [`getActiveDownloadCount()`](#getactivedownloadcount)
+    - [`getDownloadData()`](#getdownloaddata)
+- [Class: `DownloadData`](#class-downloaddata)
+  - [Properties](#properties)
+  - [`isDownloadInProgress()`](#isdownloadinprogress)
+  - [`isDownloadPaused()`](#isdownloadpaused)
+  - [`isDownloadCancelled()`](#isdownloadcancelled)
+  - [`isDownloadInterrupted()`](#isdownloadinterrupted)
+  - [`isDownloadCompleted()`](#isdownloadcompleted)
 - [Mock class](#mock-class)
 - [Acknowledgments](#acknowledgments)
 
@@ -82,11 +83,11 @@ $ npm install electron-dl-manager
 
 # Getting started
 
-You'll want to use `electron-dl-manager` in the main process of your 
+You'll want to use `electron-dl-manager` in the main process of your
 Electron application where you will be handling the file downloads.
 
-In this example, we use [IPC handlers / invokers](https://www.electronjs.org/docs/latest/tutorial/ipc#pattern-2-renderer-to-main-two-way) 
-to communicate between the main and renderer processes, but you can 
+In this example, we use [IPC handlers / invokers](https://www.electronjs.org/docs/latest/tutorial/ipc#pattern-2-renderer-to-main-two-way)
+to communicate between the main and renderer processes, but you can
 use any IPC strategy you want.
 
 ```typescript
@@ -149,13 +150,13 @@ ipcMain.handle('download-file', async (event, args) => {
       }
     }
   });
-  
+
   // Pause the download
   manager.pauseDownload(downloadId);
 });
 ```
 
-# API 
+# API
 
 ## Class: `FileDownloadManager`
 
@@ -209,7 +210,7 @@ interface DownloadParams {
   /**
    * If defined, will show a save dialog when the user
    * downloads a file.
-   * 
+   *
    * @see https://www.electronjs.org/docs/latest/api/dialog#dialogshowsavedialogbrowserwindow-options
    */
   saveDialogOptions?: SaveDialogOptions
@@ -402,7 +403,7 @@ If you need to mock out `ElectronDownloadManager` in your tests, you can use the
 
 # Acknowledgments
 
-This code uses small portions from [`electron-dl`](https://github.com/sindresorhus/electron-dl) and is noted in the 
+This code uses small portions from [`electron-dl`](https://github.com/sindresorhus/electron-dl) and is noted in the
 code where it is used.
 
 `electron-dl` is licensed under the MIT License and is maintained by Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com).
