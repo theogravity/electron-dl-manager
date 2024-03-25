@@ -1,7 +1,7 @@
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from 'electron'
 import { DownloadConfig, DownloadManagerCallbacks } from './types'
 import * as path from 'path'
-import { determineFilePath } from './utils'
+import { calculateDownloadMetrics, determineFilePath } from './utils'
 import { DownloadData } from './DownloadData'
 import { CallbackDispatcher } from './CallbackDispatcher'
 
@@ -191,11 +191,21 @@ export class DownloadInitiator {
   protected updateProgress() {
     const { item } = this.downloadData
 
-    if (item.getTotalBytes() > 0) {
-      this.downloadData.percentCompleted = parseFloat(
-        ((item.getReceivedBytes() / item.getTotalBytes()) * 100).toFixed(2)
-      )
+    const input = {
+      downloadedBytes: item.getReceivedBytes(),
+      totalBytes: item.getTotalBytes(),
+      startTimeSecs: item.getStartTime(),
     }
+
+    const metrics = calculateDownloadMetrics(input)
+
+    if (input.downloadedBytes > input.totalBytes) {
+      this.log(`Downloaded bytes (${input.downloadedBytes}) is greater than total bytes (${input.totalBytes})`)
+    }
+
+    this.downloadData.downloadRateBytesPerSecond = metrics.downloadRateBytesPerSecond
+    this.downloadData.estimatedTimeRemainingSeconds = metrics.estimatedTimeRemainingSeconds
+    this.downloadData.percentCompleted = metrics.percentCompleted
   }
 
   /**

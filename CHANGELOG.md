@@ -1,3 +1,12 @@
+# 2.1.0 (2024-03-25)
+
+Added to `DownloadData`:
+
+- Add `downloadRateBytesPerSecond`
+- Add `estimatedTimeRemainingSeconds`
+
+See Readme for more information.
+
 # 2.0.5 (2024-03-25)
 
 - Forgot to build before publishing, added build to prebuild script

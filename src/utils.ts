@@ -66,3 +66,49 @@ export function determineFilePath({
 
   return filePath
 }
+
+/**
+ * Calculates the download rate and estimated time remaining, using the start time and current time to determine elapsed time.
+ *
+ * @param {object} params - An object containing the parameters for the calculation.
+ * @param {number} params.totalBytes - The total size of the download in bytes.
+ * @param {number} params.downloadedBytes - The amount of data downloaded so far in bytes.
+ * @param {number} params.startTimeSecs - The start time of the download in seconds.
+ * @returns {object} An object containing the download rate in bytes per second and the estimated time remaining in seconds.
+ */
+export function calculateDownloadMetrics({
+  totalBytes,
+  downloadedBytes,
+  startTimeSecs,
+}: {
+  totalBytes: number
+  downloadedBytes: number
+  startTimeSecs: number
+}): {
+  percentCompleted: number
+  downloadRateBytesPerSecond: number
+  estimatedTimeRemainingSeconds: number
+} {
+  const currentTimeSecs = Math.floor(new Date().getTime() / 1000)
+  const elapsedTimeSecs = currentTimeSecs - startTimeSecs
+
+  let downloadRateBytesPerSecond = 0
+  let estimatedTimeRemainingSeconds = 0
+
+  if (elapsedTimeSecs > 0) {
+    downloadRateBytesPerSecond = downloadedBytes / elapsedTimeSecs
+
+    if (downloadRateBytesPerSecond > 0) {
+      estimatedTimeRemainingSeconds = (totalBytes - downloadedBytes) / downloadRateBytesPerSecond
+    }
+  }
+
+  const percentCompleted =
+    totalBytes > 0 ? Math.min(parseFloat(((downloadedBytes / totalBytes) * 100).toFixed(2)), 100) : 0
+
+  return {
+    percentCompleted,
+    downloadRateBytesPerSecond,
+    estimatedTimeRemainingSeconds,
+  }
+}

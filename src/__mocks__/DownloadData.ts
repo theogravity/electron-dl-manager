@@ -31,6 +31,8 @@ export function createMockDownloadData() {
     id: generateRandomId(),
     cancelledFromSaveAsDialog: false,
     percentCompleted: 0,
+    downloadRateBytesPerSecond: 0,
+    estimatedTimeRemainingSeconds: 0,
     resolvedFilename: `${generateRandomId()}.txt`,
     webContents: {} as WebContents,
     event: {} as Event,

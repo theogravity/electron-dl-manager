@@ -66,6 +66,7 @@ manager.resumeDownload(id);
     - [`getDownloadData()`](#getdownloaddata)
   - [Class: `DownloadData`](#class-downloaddata)
     - [Properties](#properties)
+      - [Formatting download progress](#formatting-download-progress)
     - [`isDownloadInProgress()`](#isdownloadinprogress)
     - [`isDownloadPaused()`](#isdownloadpaused)
     - [`isDownloadCancelled()`](#isdownloadcancelled)
@@ -345,13 +346,43 @@ event: Event
  */
 resolvedFilename: string
 /**
+ * If true, the download was cancelled from the save as dialog
+ */
+cancelledFromSaveAsDialog?: boolean
+/**
  * The percentage of the download that has been completed
  */
 percentCompleted: number
 /**
- * If true, the download was cancelled from the save as dialog
+ * The download rate in bytes per second.
  */
-cancelledFromSaveAsDialog?: boolean
+downloadRateBytesPerSecond: number
+/**
+ * The estimated time remaining in seconds.
+ */
+estimatedTimeRemainingSeconds: number
+```
+
+#### Formatting download progress
+
+You can use the libraries [`bytes`](https://www.npmjs.com/package/bytes) and [`dayjs`](https://www.npmjs.com/package/dayjs) to format the download progress.
+
+```bash
+$ npm install bytes dayjs
+$ npm install @types/bytes --save-dev
+```
+
+```typescript
+import bytes from 'bytes'
+import dayjs from 'dayjs'
+
+const downloadData = manager.getDownloadData(id); // or DataItem from the callbacks
+
+// Will return something like 1.2 MB/s
+const formattedDownloadRate = bytes(downloadData.downloadRateBytesPerSecond, { unitSeparator: ' ' }) + '/s'
+
+// Will return something like "in a few seconds"
+const formattedEstimatedTimeRemaining = dayjs.duration(downloadData.estimatedTimeRemainingSeconds, 'seconds').humanize(true)
 ```
 
 ### `isDownloadInProgress()`

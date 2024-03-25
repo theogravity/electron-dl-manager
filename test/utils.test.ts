@@ -1,4 +1,10 @@
-import { truncateUrl, generateRandomId, getFilenameFromMime, determineFilePath } from '../src/utils';
+import {
+  truncateUrl,
+  generateRandomId,
+  getFilenameFromMime,
+  determineFilePath,
+  calculateDownloadMetrics
+} from "../src/utils";
 import { DownloadItem } from 'electron'
 import { writeFile } from 'fs/promises'
 import path from 'path';
@@ -77,5 +83,72 @@ describe('determineFilePath', () => {
     const item = { getFilename: () => 'example.txt', getMimeType: () => 'text/plain' } as DownloadItem;
 
     expect(() => determineFilePath({ directory: invalidDirectory, item })).toThrow(Error('The `directory` option must be an absolute path'));
+  });
+});
+
+describe('calculateDownloadMetrics', () => {
+  const mockStartTimeSecs = 1000;
+
+  beforeAll(() => {
+    jest.spyOn(global, 'Date').mockImplementation(() => {
+      return {
+        // // Mock current time (in ms) 1000 seconds after the start time
+        getTime: () => 2000 * mockStartTimeSecs,
+      } as unknown as Date;
+    });
+  });
+
+  afterAll(() => {
+    jest.restoreAllMocks();
+  });
+
+  it('calculates the download metrics correctly for positive elapsed time', () => {
+    const result = calculateDownloadMetrics({
+      totalBytes: 5000,
+      downloadedBytes: 1000,
+      startTimeSecs: mockStartTimeSecs,
+    });
+
+    expect(result).toEqual({
+      percentCompleted: 20,
+      downloadRateBytesPerSecond: 1,
+      estimatedTimeRemainingSeconds: 4000, // 4000 bytes remaining at 1 byte/second
+    });
+  });
+
+  it('calculates zero download rate and estimated time if no time has elapsed', () => {
+    const startTimeWithNoElapsedTime = 2000; // Mock current time is the same as start time
+
+    const result = calculateDownloadMetrics({
+      totalBytes: 5000,
+      downloadedBytes: 0,
+      startTimeSecs: startTimeWithNoElapsedTime,
+    });
+
+    expect(result).toEqual({
+      percentCompleted: 0,
+      downloadRateBytesPerSecond: 0,
+      estimatedTimeRemainingSeconds: 0,
+    });
+  });
+
+  it('does not exceed 100% completion', () => {
+    const result = calculateDownloadMetrics({
+      totalBytes: 2000,
+      downloadedBytes: 5000, // More bytes downloaded than total, which could be an error
+      startTimeSecs: mockStartTimeSecs,
+    });
+
+    expect(result.percentCompleted).toBe(100);
+  });
+
+  it('handles zero totalBytes without errors and returns zero for percentCompleted', () => {
+    const result = calculateDownloadMetrics({
+      totalBytes: 0,
+      downloadedBytes: 1000,
+      startTimeSecs: mockStartTimeSecs,
+    });
+
+    expect(result.percentCompleted).toBe(0);
   });
 });

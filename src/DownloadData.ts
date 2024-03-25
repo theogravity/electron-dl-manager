@@ -30,13 +30,21 @@ export class DownloadData {
    */
   resolvedFilename: string
   /**
+   * If true, the download was cancelled from the save as dialog
+   */
+  cancelledFromSaveAsDialog?: boolean
+  /**
    * The percentage of the download that has been completed
    */
   percentCompleted: number
   /**
-   * If true, the download was cancelled from the save as dialog
+   * The download rate in bytes per second.
    */
-  cancelledFromSaveAsDialog?: boolean
+  downloadRateBytesPerSecond: number
+  /**
+   * The estimated time remaining in seconds.
+   */
+  estimatedTimeRemainingSeconds: number
 
   constructor() {
     this.id = generateRandomId()
@@ -46,6 +54,8 @@ export class DownloadData {
     this.item = {} as DownloadItem
     this.webContents = {} as WebContents
     this.event = {} as Event
+    this.downloadRateBytesPerSecond = 0
+    this.estimatedTimeRemainingSeconds = 0
   }
 
   isDownloadInProgress() {
