@@ -1,6 +1,6 @@
 {
   "name": "electron-dl-manager",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
   "main": "dist/cjs/index.js",
   "module": "dist/esm/index.js",
@@ -8,7 +8,7 @@
   "types": "dist/types/index.d.ts",
   "scripts": {
     "postinstall": "husky install",
-    "prepublishOnly": "pinst --disable",
+    "prepublishOnly": "pinst --disable && npm run clean && npm run test && npm run build",
     "postpublish": "pinst --enable",
     "build": "npm run build:cjs && npm run build:esm && npm run build:umd && npm run build:types",
     "build:cjs": "node tools/cleanup cjs && tsc -p config/tsconfig.cjs.json",

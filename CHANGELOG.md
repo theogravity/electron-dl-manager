@@ -1,3 +1,7 @@
+# 2.0.5 (2024-03-25)
+
+- Forgot to build before publishing, added build to prebuild script
+
 # 2.0.4 (2024-03-25)
 
 - Small readme fix
