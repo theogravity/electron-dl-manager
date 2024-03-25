@@ -74,6 +74,10 @@ export class DownloadData {
     return this.item.getState() === 'interrupted'
   }
 
+  isDownloadResumable() {
+    return this.item.canResume()
+  }
+
   isDownloadPaused() {
     return this.item.isPaused()
   }

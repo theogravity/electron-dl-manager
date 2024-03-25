@@ -1,3 +1,11 @@
+# 2.2.0 (2024-03-25)
+
+- Added some missing instructions for how to format the download rate / estimated time remaining
+
+Added to `DownloadData`:
+
+- `isDownloadResumable()`
+
 # 2.1.0 (2024-03-25)
 
 Added to `DownloadData`:

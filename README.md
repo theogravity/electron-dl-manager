@@ -69,6 +69,7 @@ manager.resumeDownload(id);
       - [Formatting download progress](#formatting-download-progress)
     - [`isDownloadInProgress()`](#isdownloadinprogress)
     - [`isDownloadPaused()`](#isdownloadpaused)
+    - [`isDownloadResumable()`](#isdownloadresumable)
     - [`isDownloadCancelled()`](#isdownloadcancelled)
     - [`isDownloadInterrupted()`](#isdownloadinterrupted)
     - [`isDownloadCompleted()`](#isdownloadcompleted)
@@ -375,6 +376,11 @@ $ npm install @types/bytes --save-dev
 ```typescript
 import bytes from 'bytes'
 import dayjs from 'dayjs'
+import relativeTime from 'dayjs/plugin/relativeTime';
+import duration from 'dayjs/plugin/duration';
+
+dayjs.extend(relativeTime);
+dayjs.extend(duration);
 
 const downloadData = manager.getDownloadData(id); // or DataItem from the callbacks
 
@@ -399,6 +405,14 @@ Returns true if the download is paused.
 
 ```typescript
 isDownloadPaused(): boolean
+```
+
+### `isDownloadResumable()`
+
+Returns true if the download is resumable.
+
+```typescript
+isDownloadResumable(): boolean
 ```
 
 ### `isDownloadCancelled()`
