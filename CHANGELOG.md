@@ -1,3 +1,7 @@
+# 2.0.4 (2024-03-25)
+
+- Small readme fix
+
 # 2.0.3 (2024-03-25)
 
 - Fix documentation formatting

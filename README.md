@@ -48,8 +48,6 @@ manager.pauseDownload(id);
 manager.resumeDownload(id);
 ```
 
-# Table of Contents
-
 # Table of contents
 
 - [Electron File Download Manager](#electron-file-download-manager)
