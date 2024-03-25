@@ -2,7 +2,7 @@ import crypto from 'crypto'
 import extName from 'ext-name'
 import { app, DownloadItem } from 'electron'
 import path from 'path'
-import { unusedFilenameSync } from 'unused-filename'
+import UnusedFilename from 'unused-filename'
 
 export function truncateUrl(url: string) {
   if (url.length > 50) {
@@ -61,7 +61,7 @@ export function determineFilePath({
     const filename = item.getFilename()
     const name = path.extname(filename) ? filename : getFilenameFromMime(filename, item.getMimeType())
 
-    filePath = overwrite ? path.join(directory, name) : unusedFilenameSync(path.join(directory, name))
+    filePath = overwrite ? path.join(directory, name) : UnusedFilename.sync(path.join(directory, name))
   }
 
   return filePath

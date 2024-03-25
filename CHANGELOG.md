@@ -1,3 +1,9 @@
+# 2.0.3 (2024-03-25)
+
+- Fix documentation formatting
+- Add unit tests for utils file
+- Downgraded `unused-filename` from `4` to `3` series due to issue with jest not supporting esmodules well
+
 # 2.0.2 (2024-03-22)
 
 - Fix bug where `cancelledFromSaveAsDialog` was not being set if the user cancelled from the save as dialog

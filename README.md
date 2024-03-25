@@ -48,10 +48,11 @@ manager.pauseDownload(id);
 manager.resumeDownload(id);
 ```
 
+# Table of Contents
+
 # Table of contents
 
 - [Electron File Download Manager](#electron-file-download-manager)
-- [Table of Contents](#table-of-contents)
 - [Installation](#installation)
 - [Getting started](#getting-started)
 - [API](#api)
@@ -65,13 +66,13 @@ manager.resumeDownload(id);
     - [`resumeDownload()`](#resumedownload)
     - [`getActiveDownloadCount()`](#getactivedownloadcount)
     - [`getDownloadData()`](#getdownloaddata)
-- [Class: `DownloadData`](#class-downloaddata)
-  - [Properties](#properties)
-  - [`isDownloadInProgress()`](#isdownloadinprogress)
-  - [`isDownloadPaused()`](#isdownloadpaused)
-  - [`isDownloadCancelled()`](#isdownloadcancelled)
-  - [`isDownloadInterrupted()`](#isdownloadinterrupted)
-  - [`isDownloadCompleted()`](#isdownloadcompleted)
+  - [Class: `DownloadData`](#class-downloaddata)
+    - [Properties](#properties)
+    - [`isDownloadInProgress()`](#isdownloadinprogress)
+    - [`isDownloadPaused()`](#isdownloadpaused)
+    - [`isDownloadCancelled()`](#isdownloadcancelled)
+    - [`isDownloadInterrupted()`](#isdownloadinterrupted)
+    - [`isDownloadCompleted()`](#isdownloadcompleted)
 - [Mock class](#mock-class)
 - [Acknowledgments](#acknowledgments)
 
@@ -314,11 +315,11 @@ Returns the download data for a download.
 getDownloadData(id: string): DownloadData
 ```
 
-# Class: `DownloadData`
+## Class: `DownloadData`
 
 Data returned in the callbacks for a download.
 
-## Properties
+### Properties
 
 ```typescript
   /**
@@ -355,7 +356,7 @@ percentCompleted: number
 cancelledFromSaveAsDialog?: boolean
 ```
 
-## `isDownloadInProgress()`
+### `isDownloadInProgress()`
 
 Returns true if the download is in progress.
 
@@ -363,7 +364,7 @@ Returns true if the download is in progress.
 isDownloadInProgress(): boolean
 ```
 
-## `isDownloadPaused()`
+### `isDownloadPaused()`
 
 Returns true if the download is paused.
 
@@ -371,7 +372,7 @@ Returns true if the download is paused.
 isDownloadPaused(): boolean
 ```
 
-## `isDownloadCancelled()`
+### `isDownloadCancelled()`
 
 Returns true if the download is cancelled.
 
@@ -379,7 +380,7 @@ Returns true if the download is cancelled.
 isDownloadCancelled(): boolean
 ```
 
-## `isDownloadInterrupted()`
+### `isDownloadInterrupted()`
 
 Returns true if the download is interrupted.
 
@@ -387,7 +388,7 @@ Returns true if the download is interrupted.
 isDownloadInterrupted(): boolean
 ```
 
-## `isDownloadCompleted()`
+### `isDownloadCompleted()`
 
 Returns true if the download is completed.
 
