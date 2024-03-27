@@ -182,6 +182,8 @@ export class DownloadInitiator {
     item.setSavePath(filePath)
     this.log(`Initiating download item handlers`)
 
+    this.downloadData.resolvedFilename = path.basename(filePath)
+
     await this.callbackDispatcher.onDownloadStarted(this.downloadData)
     item.on('updated', this.generateItemOnUpdated())
     item.once('done', this.generateItemOnDone())
@@ -200,6 +202,7 @@ export class DownloadInitiator {
     const metrics = calculateDownloadMetrics(input)
 
     if (input.downloadedBytes > input.totalBytes) {
+      // Note: This situation will happen when using data: URIs
       this.log(`Downloaded bytes (${input.downloadedBytes}) is greater than total bytes (${input.totalBytes})`)
     }
 
@@ -220,6 +223,7 @@ export class DownloadInitiator {
           break
         }
         case 'interrupted': {
+          this.downloadData.interruptedVia = 'in-progress'
           await this.callbackDispatcher.onDownloadInterrupted(this.downloadData)
           break
         }
@@ -241,6 +245,10 @@ export class DownloadInitiator {
         }
         case 'cancelled':
           await this.callbackDispatcher.onDownloadCancelled(this.downloadData)
+          break
+        case 'interrupted':
+          this.downloadData.interruptedVia = 'completed'
+          await this.callbackDispatcher.onDownloadInterrupted(this.downloadData)
           break
         default:
           this.log(`Unexpected itemOnDone state: ${state}`)

@@ -45,6 +45,10 @@ export class DownloadData {
    * The estimated time remaining in seconds.
    */
   estimatedTimeRemainingSeconds: number
+  /**
+   * If the download was interrupted, the state in which it was interrupted from
+   */
+  interruptedVia?: 'in-progress' | 'completed'
 
   constructor() {
     this.id = generateRandomId()

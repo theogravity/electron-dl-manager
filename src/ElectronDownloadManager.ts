@@ -83,10 +83,6 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the id of the download.
    */
   download(params: DownloadConfig) {
-    if (!params.saveAsFilename && !params.saveDialogOptions) {
-      throw new Error('You must define either saveAsFilename or saveDialogOptions to start a download')
-    }
-
     if (params.saveAsFilename && params.saveDialogOptions) {
       throw new Error('You cannot define both saveAsFilename and saveDialogOptions to start a download')
     }

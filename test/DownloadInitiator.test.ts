@@ -114,7 +114,7 @@ describe('DownloadInitiator', () => {
   })
 
   describe('initNonInteractiveDownload', () => {
-    it('it should call onDownloadStarted', async () => {
+    it('should call onDownloadStarted', async () => {
       const downloadInitiator = new DownloadInitiator({})
       downloadInitiator['downloadData'] = mockDownloadData
 
@@ -123,6 +123,19 @@ describe('DownloadInitiator', () => {
         callbacks,
       })(mockEvent, mockItem, mockWebContents)
 
+      expect(mockItem.resolvedFilename).toBe('test.txt')
+      expect(downloadInitiator['callbackDispatcher'].onDownloadStarted).toHaveBeenCalled()
+    })
+
+    it('should not require saveAsFilename', async () => {
+      const downloadInitiator = new DownloadInitiator({})
+      downloadInitiator['downloadData'] = mockDownloadData
+
+      await downloadInitiator.generateOnWillDownload({
+        callbacks,
+      })(mockEvent, mockItem, mockWebContents)
+
+      expect(mockItem.resolvedFilename).toBe('example.txt')
       expect(downloadInitiator['callbackDispatcher'].onDownloadStarted).toHaveBeenCalled()
     })
   })
@@ -152,6 +165,7 @@ describe('DownloadInitiator', () => {
 
         await itemOnUpdated(mockEvent, 'interrupted')
 
+        expect(mockDownloadData.interruptedVia).toBe('in-progress')
         expect(downloadInitiator['callbackDispatcher'].onDownloadInterrupted).toHaveBeenCalledWith(mockDownloadData)
       })
     })
@@ -184,6 +198,20 @@ describe('DownloadInitiator', () => {
 
       expect(downloadInitiator['callbackDispatcher'].onDownloadCancelled).toHaveBeenCalledWith(mockDownloadData)
       expect(downloadInitiator['cleanup']).toHaveBeenCalled()
+    })
+
+    it.only('should handle interrupted state', async () => {
+      const downloadInitiator = new DownloadInitiator({})
+      downloadInitiator['downloadData'] = mockDownloadData
+      downloadInitiator['callbackDispatcher'].onDownloadInterrupted = jest.fn()
+      downloadInitiator['cleanup'] = jest.fn()
+
+      const itemOnDone = downloadInitiator['generateItemOnDone']()
+
+      await itemOnDone(mockEvent, 'interrupted')
+
+      expect(mockDownloadData.interruptedVia).toBe('completed')
+      expect(downloadInitiator['callbackDispatcher'].onDownloadInterrupted).toHaveBeenCalledWith(mockDownloadData)
     })
   })
 })

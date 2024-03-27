@@ -1,3 +1,10 @@
+# 2.3.0 (2024-03-27)
+
+- Implement `onDownloadInterrupted()` for the download `completed` state. This should cover urls that result in 404s. 
+  * Added new property `interruptedVia` to `DownloadData` to indicate the state in which the download was interrupted from.
+- Removed the restriction on having to specify `saveAsFilename` since it should auto-calculate the filename from the URL if not provided.
+- Fixed a bug where `resolvedFilename` was not populated when not using a save as dialog.
+
 # 2.2.0 (2024-03-25)
 
 - Added some missing instructions for how to format the download rate / estimated time remaining
