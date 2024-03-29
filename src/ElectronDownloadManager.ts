@@ -1,43 +1,48 @@
-import type { BrowserWindow } from 'electron'
-import { DownloadManagerConstructorParams, DownloadConfig, IElectronDownloadManager, DebugLoggerFn } from './types'
-import { truncateUrl } from './utils'
-import { DownloadInitiator } from './DownloadInitiator'
-import { DownloadData } from './DownloadData'
+import type { BrowserWindow } from "electron";
+import type { DownloadData } from "./DownloadData";
+import { DownloadInitiator } from "./DownloadInitiator";
+import type {
+  DebugLoggerFn,
+  DownloadConfig,
+  DownloadManagerConstructorParams,
+  IElectronDownloadManager,
+} from "./types";
+import { truncateUrl } from "./utils";
 
 /**
  * Enables handling downloads in Electron.
  */
 export class ElectronDownloadManager implements IElectronDownloadManager {
-  protected downloadData: Record<string, DownloadData>
-  protected logger: DebugLoggerFn
+  protected downloadData: Record<string, DownloadData>;
+  protected logger: DebugLoggerFn;
 
   constructor(params: DownloadManagerConstructorParams = {}) {
-    this.downloadData = {}
-    this.logger = params.debugLogger || (() => {})
+    this.downloadData = {};
+    this.logger = params.debugLogger || (() => {});
   }
 
   protected log(message: string) {
-    this.logger(message)
+    this.logger(message);
   }
 
   /**
    * Returns the current download data
    */
   getDownloadData(id: string): DownloadData {
-    return this.downloadData[id]
+    return this.downloadData[id];
   }
 
   /**
    * Cancels a download
    */
   cancelDownload(id: string) {
-    const data = this.downloadData[id]
+    const data = this.downloadData[id];
 
     if (data?.item) {
-      this.log(`[${id}] Cancelling download`)
-      data.item.cancel()
+      this.log(`[${id}] Cancelling download`);
+      data.item.cancel();
     } else {
-      this.log(`[${id}] Download ${id} not found for cancellation`)
+      this.log(`[${id}] Download ${id} not found for cancellation`);
     }
   }
 
@@ -45,13 +50,13 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Pauses a download
    */
   pauseDownload(id: string) {
-    const data = this.downloadData[id]
+    const data = this.downloadData[id];
 
     if (data?.item) {
-      this.log(`[${id}] Pausing download`)
-      data.item.pause()
+      this.log(`[${id}] Pausing download`);
+      data.item.pause();
     } else {
-      this.log(`[${id}] Download ${id} not found for pausing`)
+      this.log(`[${id}] Download ${id} not found for pausing`);
     }
   }
 
@@ -59,13 +64,13 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Resumes a download
    */
   resumeDownload(id: string) {
-    const data = this.downloadData[id]
+    const data = this.downloadData[id];
 
     if (data?.item.isPaused()) {
-      this.log(`[${id}] Resuming download`)
-      data.item.resume()
+      this.log(`[${id}] Resuming download`);
+      data.item.resume();
     } else {
-      this.log(`[${id}] Download ${id} not found or is not in a paused state`)
+      this.log(`[${id}] Download ${id} not found or is not in a paused state`);
     }
   }
 
@@ -73,7 +78,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the number of active downloads
    */
   getActiveDownloadCount() {
-    return Object.values(this.downloadData).filter((data) => data.isDownloadInProgress()).length
+    return Object.values(this.downloadData).filter((data) => data.isDownloadInProgress()).length;
   }
 
   /**
@@ -84,29 +89,29 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    */
   download(params: DownloadConfig) {
     if (params.saveAsFilename && params.saveDialogOptions) {
-      throw new Error('You cannot define both saveAsFilename and saveDialogOptions to start a download')
+      throw new Error("You cannot define both saveAsFilename and saveDialogOptions to start a download");
     }
 
     const downloadInitiator = new DownloadInitiator({
       debugLogger: this.logger,
       onCleanup: (data) => {
-        this.cleanup(data)
+        this.cleanup(data);
       },
-    })
+    });
 
-    this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`)
-    params.window.webContents.session.once('will-download', downloadInitiator.generateOnWillDownload(params))
-    params.window.webContents.downloadURL(params.url, params.downloadURLOptions)
+    this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
+    params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
+    params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
 
-    const downloadId = downloadInitiator.getDownloadId()
+    const downloadId = downloadInitiator.getDownloadId();
 
-    this.downloadData[downloadId] = downloadInitiator.getDownloadData()
+    this.downloadData[downloadId] = downloadInitiator.getDownloadData();
 
-    return downloadId
+    return downloadId;
   }
 
   protected cleanup(data: DownloadData) {
-    delete this.downloadData[data.id]
+    delete this.downloadData[data.id];
   }
 
   /**
@@ -120,35 +125,35 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   static async throttleConnections(
     window: BrowserWindow,
     conditions: {
-      offline?: boolean
-      latency?: number
-      downloadThroughput?: number
-      uploadThroughput?: number
-      connectionType?: string
-      packetLoss?: number
-      packetQueueLength?: number
-      packetReordering?: number
-    }
+      offline?: boolean;
+      latency?: number;
+      downloadThroughput?: number;
+      uploadThroughput?: number;
+      connectionType?: string;
+      packetLoss?: number;
+      packetQueueLength?: number;
+      packetReordering?: number;
+    },
   ) {
-    const dbg = window.webContents.debugger
-    dbg.attach()
-    await dbg.sendCommand('Network.enable')
-    await dbg.sendCommand('Network.emulateNetworkConditions', conditions)
+    const dbg = window.webContents.debugger;
+    dbg.attach();
+    await dbg.sendCommand("Network.enable");
+    await dbg.sendCommand("Network.emulateNetworkConditions", conditions);
   }
 
   /**
    * Disables network throttling on a BrowserWindow
    */
   static async disableThrottle(window: BrowserWindow) {
-    const dbg = window.webContents.debugger
-    dbg.attach()
-    await dbg.sendCommand('Network.enable')
-    await dbg.sendCommand('Network.emulateNetworkConditions', {
+    const dbg = window.webContents.debugger;
+    dbg.attach();
+    await dbg.sendCommand("Network.enable");
+    await dbg.sendCommand("Network.emulateNetworkConditions", {
       offline: false,
       downloadThroughput: -1,
       uploadThroughput: -1,
       latency: 0,
-    })
-    dbg.detach()
+    });
+    dbg.detach();
   }
 }

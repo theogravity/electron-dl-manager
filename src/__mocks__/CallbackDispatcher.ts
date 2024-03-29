@@ -6,5 +6,5 @@ export const CallbackDispatcher = jest.fn().mockImplementation(() => {
     onDownloadProgress: jest.fn(),
     onDownloadInterrupted: jest.fn(),
     handleError: jest.fn(),
-  }
-})
+  };
+});

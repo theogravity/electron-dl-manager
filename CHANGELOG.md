@@ -1,3 +1,11 @@
+# 2.3.1 (2024-03-28)
+
+No actual logic changes.
+
+- Remove postinstall script
+- Remove eslint and use biome.js for linting / formatting instead
+- Remove unnecessary devDep packages.
+
 # 2.3.0 (2024-03-27)
 
 - Implement `onDownloadInterrupted()` for the download `completed` state. This should cover urls that result in 404s. 

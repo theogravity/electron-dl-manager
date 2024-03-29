@@ -1,5 +1,5 @@
-import type { DownloadItem, Event, WebContents } from 'electron'
-import { generateRandomId } from './utils'
+import type { DownloadItem, Event, WebContents } from "electron";
+import { generateRandomId } from "./utils";
 
 /**
  * Contains the data for a download.
@@ -8,81 +8,81 @@ export class DownloadData {
   /**
    * Generated id for the download
    */
-  id: string
+  id: string;
   /**
    * The Electron.DownloadItem. Use this to grab the filename, path, etc.
    * @see https://www.electronjs.org/docs/latest/api/download-item
    */
-  item: DownloadItem
+  item: DownloadItem;
   /**
    * The Electron.WebContents
    * @see https://www.electronjs.org/docs/latest/api/web-contents
    */
-  webContents: WebContents
+  webContents: WebContents;
   /**
    * The Electron.Event
    * @see https://www.electronjs.org/docs/latest/api/event
    */
-  event: Event
+  event: Event;
   /**
    * The name of the file that is being saved to the user's computer.
    * Recommended over Item.getFilename() as it may be inaccurate when using the save as dialog.
    */
-  resolvedFilename: string
+  resolvedFilename: string;
   /**
    * If true, the download was cancelled from the save as dialog
    */
-  cancelledFromSaveAsDialog?: boolean
+  cancelledFromSaveAsDialog?: boolean;
   /**
    * The percentage of the download that has been completed
    */
-  percentCompleted: number
+  percentCompleted: number;
   /**
    * The download rate in bytes per second.
    */
-  downloadRateBytesPerSecond: number
+  downloadRateBytesPerSecond: number;
   /**
    * The estimated time remaining in seconds.
    */
-  estimatedTimeRemainingSeconds: number
+  estimatedTimeRemainingSeconds: number;
   /**
    * If the download was interrupted, the state in which it was interrupted from
    */
-  interruptedVia?: 'in-progress' | 'completed'
+  interruptedVia?: "in-progress" | "completed";
 
   constructor() {
-    this.id = generateRandomId()
-    this.resolvedFilename = 'testFile.txt'
-    this.percentCompleted = 0
-    this.cancelledFromSaveAsDialog = false
-    this.item = {} as DownloadItem
-    this.webContents = {} as WebContents
-    this.event = {} as Event
-    this.downloadRateBytesPerSecond = 0
-    this.estimatedTimeRemainingSeconds = 0
+    this.id = generateRandomId();
+    this.resolvedFilename = "testFile.txt";
+    this.percentCompleted = 0;
+    this.cancelledFromSaveAsDialog = false;
+    this.item = {} as DownloadItem;
+    this.webContents = {} as WebContents;
+    this.event = {} as Event;
+    this.downloadRateBytesPerSecond = 0;
+    this.estimatedTimeRemainingSeconds = 0;
   }
 
   isDownloadInProgress() {
-    return this.item.getState() === 'progressing'
+    return this.item.getState() === "progressing";
   }
 
   isDownloadCompleted() {
-    return this.item.getState() === 'completed'
+    return this.item.getState() === "completed";
   }
 
   isDownloadCancelled() {
-    return this.item.getState() === 'cancelled'
+    return this.item.getState() === "cancelled";
   }
 
   isDownloadInterrupted() {
-    return this.item.getState() === 'interrupted'
+    return this.item.getState() === "interrupted";
   }
 
   isDownloadResumable() {
-    return this.item.canResume()
+    return this.item.canResume();
   }
 
   isDownloadPaused() {
-    return this.item.isPaused()
+    return this.item.isPaused();
   }
 }

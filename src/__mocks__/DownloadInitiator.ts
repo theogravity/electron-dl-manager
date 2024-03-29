@@ -1,5 +1,5 @@
-import { CallbackDispatcher } from './CallbackDispatcher'
-import { DownloadData } from './DownloadData'
+import { CallbackDispatcher } from "./CallbackDispatcher";
+import { DownloadData } from "./DownloadData";
 
 export const DownloadInitiator = jest.fn().mockImplementation(() => {
   return {
@@ -20,5 +20,5 @@ export const DownloadInitiator = jest.fn().mockImplementation(() => {
     generateItemOnDone: jest.fn(),
     cleanup: jest.fn(),
     updateProgress: jest.fn(),
-  }
-})
+  };
+});
