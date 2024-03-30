@@ -20,9 +20,9 @@ Electron 26.0.0 or later is required.
 ```typescript
 // In main process
 // Not a working example, just a demonstration of the API
-import { FileDownloadManager } from 'electron-dl-manager';
+import { ElectronDownloadManager } from 'electron-dl-manager';
 
-const manager = new FileDownloadManager();
+const manager = new ElectronDownloadManager();
 
 // Start a download
 manager.download({
@@ -54,7 +54,7 @@ manager.resumeDownload(id);
 - [Installation](#installation)
 - [Getting started](#getting-started)
 - [API](#api)
-  - [Class: `FileDownloadManager`](#class-filedownloadmanager)
+  - [Class: `ElectronDownloadManager`](#class-ElectronDownloadManager)
     - [`constructor()`](#constructor)
     - [`download()`](#download)
       - [Interface: `DownloadParams`](#interface-downloadparams)
@@ -94,10 +94,10 @@ use any IPC strategy you want.
 ```typescript
 // MainIpcHandlers.ts
 
-import { FileDownloadManager } from 'electron-dl-manager';
+import { ElectronDownloadManager } from 'electron-dl-manager';
 import { ipcMain } from 'electron';
 
-const manager = new FileDownloadManager();
+const manager = new ElectronDownloadManager();
 
 // Renderer would invoke this handler to start a download
 ipcMain.handle('download-file', async (event, args) => {
@@ -159,7 +159,7 @@ ipcMain.handle('download-file', async (event, args) => {
 
 # API
 
-## Class: `FileDownloadManager`
+## Class: `ElectronDownloadManager`
 
 Manages file downloads in an Electron application.
 

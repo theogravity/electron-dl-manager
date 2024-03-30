@@ -1,3 +1,8 @@
+# 2.4.0 (2024-03-30)
+
+- Fix readme. Should be `ElectronDownloadManager`
+not `FileDownloadManager`
+
 # 2.3.1 (2024-03-28)
 
 No actual logic changes.
