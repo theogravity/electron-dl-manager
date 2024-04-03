@@ -148,6 +148,7 @@ export class DownloadInitiator {
 
         this.downloadData.resolvedFilename = path.basename(item.getSavePath());
 
+        this.augmentDownloadItem(item);
         await this.callbackDispatcher.onDownloadStarted(this.downloadData);
         // If for some reason the above pause didn't work...
         // We'll manually call the completed handler
@@ -157,7 +158,10 @@ export class DownloadInitiator {
           item.on("updated", this.generateItemOnUpdated());
           item.once("done", this.generateItemOnDone());
         }
-        item.resume();
+
+        if (!item['_userInitiatedPause']) {
+          item.resume();
+        }
       } else if (this.downloadData.isDownloadCancelled()) {
         clearInterval(interval);
         this.log("Download was cancelled by user");
@@ -167,6 +171,18 @@ export class DownloadInitiator {
         this.log("Waiting for save path to be chosen by user");
       }
     }, 1000);
+  }
+
+  private augmentDownloadItem(item: DownloadItem) {
+    // This covers if the user manually pauses the download
+    // before we have set up the event listeners on the item
+    item['_userInitiatedPause'] = false;
+
+    const oldPause = item.pause;
+    item.pause = () => {
+      item['_userInitiatedPause'] = true;
+      oldPause();
+    };
   }
 
   /**
@@ -184,10 +200,14 @@ export class DownloadInitiator {
 
     this.downloadData.resolvedFilename = path.basename(filePath);
 
+    this.augmentDownloadItem(item);
     await this.callbackDispatcher.onDownloadStarted(this.downloadData);
     item.on("updated", this.generateItemOnUpdated());
     item.once("done", this.generateItemOnDone());
-    item.resume();
+
+    if (!item['_userInitiatedPause']) {
+      item.resume();
+    }
   }
 
   protected updateProgress() {

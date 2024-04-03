@@ -1,3 +1,9 @@
+# 2.4.1 (2024-04-03)
+
+- Fix issue where pausing a download won't pause it
+  * This can happen if you pause right after starting a download where internally we pause then resume after 
+  internal handlers are set. Now we'll track if the user has paused and will not auto-resume after.
+
 # 2.4.0 (2024-03-30)
 
 - Fix readme. Should be `ElectronDownloadManager`
