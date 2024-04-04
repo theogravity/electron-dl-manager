@@ -1,3 +1,17 @@
+# 3.0.0 (2024-04-04)
+
+Adds fixes around `DownloadData` population.
+
+**Breaking changes**
+
+`DownloadManager.download()` is now `async`.
+
+This change is necessary to fix a race condition where `download()` is called, but if you immediately try to perform an
+operation against the returned id, such as `pauseDownload()`, the `DownloadItem` has not been properly initialized
+since the event that populates `DownloadItem` is out-of-band.
+
+So the new `download()` implementation waits until `DownloadItem` is properly initialized before returning the id.
+
 # 2.4.1 (2024-04-03)
 
 - Fix issue where pausing a download won't pause it

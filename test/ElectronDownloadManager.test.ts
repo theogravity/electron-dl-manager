@@ -2,6 +2,7 @@ import { DownloadData, ElectronDownloadManager } from "../src";
 import { createMockDownloadData } from "../src/__mocks__/DownloadData";
 
 jest.mock("unused-filename");
+jest.mock("../src/DownloadInitiator");
 
 describe("ElectronDownloadManager", () => {
   it("should get download data", () => {
@@ -68,6 +69,7 @@ describe("ElectronDownloadManager", () => {
 
   it("should download a file", async () => {
     const downloadManager = new ElectronDownloadManager();
+    const { item } = createMockDownloadData();
 
     const params = {
       url: "https://example.com/test.txt",
@@ -75,7 +77,11 @@ describe("ElectronDownloadManager", () => {
       window: {
         webContents: {
           session: {
-            once: jest.fn(),
+            once: jest.fn().mockImplementation((event, handler) => {
+              // Trigger the event handler manually with mock data
+              const mockWebContents = {};
+              handler(null, item, mockWebContents);
+            }),
           },
           downloadURL: jest.fn(),
         },
@@ -83,10 +89,19 @@ describe("ElectronDownloadManager", () => {
       callbacks: {} as any,
     };
 
-    const downloadId = downloadManager.download(params);
+    // Call download which registers the event and triggers downloadURL
+    const downloadPromise = downloadManager.download(params);
 
+    // Jest tick to make sure all Promises have a chance to resolve
+    await new Promise(process.nextTick);
+
+    // Assert that the event listener for "will-download" has been added
     expect(params.window.webContents.session.once).toBeCalledWith("will-download", expect.any(Function));
+
+    // Assert that downloadURL was called with the correct parameters
     expect(params.window.webContents.downloadURL).toBeCalledWith(params.url, undefined);
-    expect(downloadId).toEqual(expect.any(String));
+
+    // Assert that the downloadId will be a string once the promise resolves
+    await expect(downloadPromise).resolves.toEqual(expect.any(String));
   });
 });

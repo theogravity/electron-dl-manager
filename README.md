@@ -25,7 +25,7 @@ import { ElectronDownloadManager } from 'electron-dl-manager';
 const manager = new ElectronDownloadManager();
 
 // Start a download
-manager.download({
+const id = await manager.download({
   window: browserWindowInstance,
   url: 'https://example.com/file.zip',
   saveDialogOptions: {
@@ -106,7 +106,7 @@ ipcMain.handle('download-file', async (event, args) => {
   let downloadId
   const browserWindow = BrowserWindow.fromId(event.sender.id)
 
-  downloadId = manager.download({
+  downloadId = await manager.download({
     window: browserWindow,
     url,
     // If you want to download without a save as dialog
@@ -183,7 +183,7 @@ interface DownloadManagerConstructorParams {
 Starts a file download. Returns the `id` of the download.
 
 ```typescript
-download(params: DownloadParams): string
+download(params: DownloadParams): Promise<string>
 ```
 
 #### Interface: `DownloadParams`

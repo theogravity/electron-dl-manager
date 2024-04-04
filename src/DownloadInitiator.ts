@@ -8,6 +8,7 @@ import { calculateDownloadMetrics, determineFilePath } from "./utils";
 interface DownloadInitiatorConstructorParams {
   debugLogger?: (message: string) => void;
   onCleanup?: (id: DownloadData) => void;
+  onDownloadInit?: (id: DownloadData) => void;
 }
 
 interface WillOnDownloadParams {
@@ -52,6 +53,10 @@ export class DownloadInitiator {
    */
   private onItemDone: (event: Event, state: "completed" | "cancelled" | "interrupted") => Promise<void>;
   /**
+   * When the download is initiated
+   */
+  private onDownloadInit: (data: DownloadData) => void;
+  /**
    * When cleanup is called
    */
   private onCleanup: (data: DownloadData) => void;
@@ -71,6 +76,7 @@ export class DownloadInitiator {
     this.onItemUpdated = () => Promise.resolve();
     this.onItemDone = () => Promise.resolve();
     this.onCleanup = config.onCleanup || (() => {});
+    this.onDownloadInit = config.onDownloadInit || (() => {});
     this.config = {} as DownloadConfig;
     this.callbackDispatcher = {} as CallbackDispatcher;
   }
@@ -106,6 +112,10 @@ export class DownloadInitiator {
       this.downloadData.item = item;
       this.downloadData.webContents = webContents;
       this.downloadData.event = event;
+
+      if (this.onDownloadInit) {
+        this.onDownloadInit(this.downloadData);
+      }
 
       if (this.config.saveDialogOptions) {
         this.initSaveAsInteractiveDownload();
@@ -143,7 +153,7 @@ export class DownloadInitiator {
       if (item.getSavePath()) {
         clearInterval(interval);
 
-        this.log(`User selected save path to ${this.downloadData.item.getSavePath()}`);
+        this.log(`User selected save path to ${item.getSavePath()}`);
         this.log("Initiating download item handlers");
 
         this.downloadData.resolvedFilename = path.basename(item.getSavePath());
@@ -159,7 +169,7 @@ export class DownloadInitiator {
           item.once("done", this.generateItemOnDone());
         }
 
-        if (!item['_userInitiatedPause']) {
+        if (!item["_userInitiatedPause"]) {
           item.resume();
         }
       } else if (this.downloadData.isDownloadCancelled()) {
@@ -176,11 +186,11 @@ export class DownloadInitiator {
   private augmentDownloadItem(item: DownloadItem) {
     // This covers if the user manually pauses the download
     // before we have set up the event listeners on the item
-    item['_userInitiatedPause'] = false;
+    item["_userInitiatedPause"] = false;
 
-    const oldPause = item.pause;
+    const oldPause = item.pause.bind(item);
     item.pause = () => {
-      item['_userInitiatedPause'] = true;
+      item["_userInitiatedPause"] = true;
       oldPause();
     };
   }
@@ -205,7 +215,7 @@ export class DownloadInitiator {
     item.on("updated", this.generateItemOnUpdated());
     item.once("done", this.generateItemOnDone());
 
-    if (!item['_userInitiatedPause']) {
+    if (!item["_userInitiatedPause"]) {
       item.resume();
     }
   }

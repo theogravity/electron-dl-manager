@@ -11,6 +11,9 @@
   "linter": {
     "enabled": true,
     "rules": {
+      "complexity": {
+        "useLiteralKeys": "off"
+      },
       "suspicious": {
         "noImplicitAnyLet": "off",
         "noExplicitAny": "off"

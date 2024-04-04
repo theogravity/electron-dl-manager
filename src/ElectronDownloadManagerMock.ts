@@ -6,7 +6,7 @@ import type { DownloadConfig, IElectronDownloadManager } from "./types";
  * that can be used for testing purposes
  */
 export class ElectronDownloadManagerMock implements IElectronDownloadManager {
-  download(_params: DownloadConfig): string {
+  async download(_params: DownloadConfig): Promise<string> {
     return "mock-download-id";
   }
 
