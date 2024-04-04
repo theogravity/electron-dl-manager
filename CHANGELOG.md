@@ -4,7 +4,7 @@ Adds fixes around `DownloadData` population.
 
 **Breaking changes**
 
-`DownloadManager.download()` is now `async`.
+`ElectronDownloadManager.download()` is now `async`.
 
 This change is necessary to fix a race condition where `download()` is called, but if you immediately try to perform an
 operation against the returned id, such as `pauseDownload()`, the `DownloadItem` has not been properly initialized
