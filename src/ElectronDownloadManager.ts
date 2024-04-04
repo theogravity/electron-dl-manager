@@ -66,7 +66,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   resumeDownload(id: string) {
     const data = this.downloadData[id];
 
-    if (data?.item.isPaused()) {
+    if (data?.item?.isPaused()) {
       this.log(`[${id}] Resuming download`);
       data.item.resume();
     } else {
@@ -87,27 +87,31 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    *
    * Returns the id of the download.
    */
-  download(params: DownloadConfig) {
-    if (params.saveAsFilename && params.saveDialogOptions) {
-      throw new Error("You cannot define both saveAsFilename and saveDialogOptions to start a download");
-    }
+  async download(params: DownloadConfig): Promise<string> {
+    return new Promise((resolve, reject) => {
+      try {
+        if (params.saveAsFilename && params.saveDialogOptions) {
+          return reject(Error("You cannot define both saveAsFilename and saveDialogOptions to start a download"));
+        }
 
-    const downloadInitiator = new DownloadInitiator({
-      debugLogger: this.logger,
-      onCleanup: (data) => {
-        this.cleanup(data);
-      },
+        const downloadInitiator = new DownloadInitiator({
+          debugLogger: this.logger,
+          onCleanup: (data) => {
+            this.cleanup(data);
+          },
+          onDownloadInit: (data) => {
+            this.downloadData[data.id] = data;
+            resolve(data.id);
+          },
+        });
+
+        this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
+        params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
+        params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
+      } catch (e) {
+        reject(e);
+      }
     });
-
-    this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
-    params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
-    params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
-
-    const downloadId = downloadInitiator.getDownloadId();
-
-    this.downloadData[downloadId] = downloadInitiator.getDownloadData();
-
-    return downloadId;
   }
 
   protected cleanup(data: DownloadData) {

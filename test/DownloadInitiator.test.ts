@@ -77,12 +77,12 @@ describe("DownloadInitiator", () => {
       expect(mockDownloadData.cancelledFromSaveAsDialog).toBe(true);
     });
 
-    describe('user initiated pause', () => {
-      it('should not resume the download if the user paused it before init', async () => {
+    describe("user initiated pause", () => {
+      it("should not resume the download if the user paused it before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
 
-        mockItem['_userInitiatedPause'] = true;
+        mockItem["_userInitiatedPause"] = true;
         mockItem.getSavePath.mockReturnValue("");
         mockDownloadData.isDownloadCancelled.mockReturnValue(true);
 
@@ -94,13 +94,13 @@ describe("DownloadInitiator", () => {
         await jest.runAllTimersAsync();
 
         expect(mockItem.resume).not.toHaveBeenCalled();
-      })
+      });
 
-      it('should not resume the download if the did not pause before init', async () => {
+      it("should not resume the download if the did not pause before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
 
-        mockItem['_userInitiatedPause'] = false;
+        mockItem["_userInitiatedPause"] = false;
         mockItem.getSavePath.mockReturnValue("");
         mockDownloadData.isDownloadCancelled.mockReturnValue(true);
 
@@ -112,8 +112,8 @@ describe("DownloadInitiator", () => {
         await jest.runAllTimersAsync();
 
         expect(mockItem.resume).toHaveBeenCalled();
-      })
-    })
+      });
+    });
 
     describe("path was set", () => {
       it("should call onDownloadStarted", async () => {
@@ -178,11 +178,11 @@ describe("DownloadInitiator", () => {
       expect(downloadInitiator.callbackDispatcher.onDownloadStarted).toHaveBeenCalled();
     });
 
-    describe('user initiated pause', () => {
-      it('should not resume the download if the user paused it before init', async () => {
+    describe("user initiated pause", () => {
+      it("should not resume the download if the user paused it before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
-        mockItem['_userInitiatedPause'] = true;
+        mockItem["_userInitiatedPause"] = true;
 
         await downloadInitiator.generateOnWillDownload({
           callbacks,
@@ -191,12 +191,12 @@ describe("DownloadInitiator", () => {
         await jest.runAllTimersAsync();
 
         expect(mockItem.resume).not.toHaveBeenCalled();
-      })
+      });
 
-      it('should not resume the download if the did not pause before init', async () => {
+      it("should not resume the download if the did not pause before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
-        mockItem['_userInitiatedPause'] = true;
+        mockItem["_userInitiatedPause"] = true;
 
         await downloadInitiator.generateOnWillDownload({
           callbacks,
@@ -205,8 +205,8 @@ describe("DownloadInitiator", () => {
         await jest.runAllTimersAsync();
 
         expect(mockItem.resume).toHaveBeenCalled();
-      })
-    })
+      });
+    });
   });
 
   describe("event handlers", () => {

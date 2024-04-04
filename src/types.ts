@@ -126,7 +126,7 @@ export interface IElectronDownloadManager {
    *
    * Returns the id of the download.
    */
-  download(params: DownloadConfig): string;
+  download(params: DownloadConfig): Promise<string>;
   /**
    * Cancels a download
    */
