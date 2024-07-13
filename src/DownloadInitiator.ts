@@ -191,8 +191,17 @@ export class DownloadInitiator {
     const oldPause = item.pause.bind(item);
     item.pause = () => {
       item["_userInitiatedPause"] = true;
+      // Don't fire progress updates in a paused state
+      item.off("updated", this.generateItemOnUpdated());
       oldPause();
     };
+
+    const oldResume = item.resume.bind(item)
+
+    item.resume = () => {
+        item.on("updated", this.generateItemOnUpdated());
+        oldResume();
+    }
   }
 
   /**
