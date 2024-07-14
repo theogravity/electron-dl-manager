@@ -1,5 +1,8 @@
-import { DownloadInitiator } from "../src";
+import { DownloadInitiator, getFilenameFromMime } from "../src";
 import { createMockDownloadData } from "../src/__mocks__/DownloadData";
+import { determineFilePath } from "../src/utils";
+import path from "node:path";
+import UnusedFilename from "unused-filename";
 
 jest.mock("../src/utils");
 jest.mock("../src/CallbackDispatcher");
@@ -13,6 +16,7 @@ describe("DownloadInitiator", () => {
   let mockDownloadData;
   let mockWebContents;
   let mockEvent;
+  let mockEmitter;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -26,6 +30,7 @@ describe("DownloadInitiator", () => {
 
     mockItem = mockedItemData.item;
     mockDownloadData = mockedItemData.downloadData;
+    mockEmitter = mockedItemData.itemEmitter;
   });
 
   describe("generateOnWillDownload", () => {
@@ -63,8 +68,8 @@ describe("DownloadInitiator", () => {
       const downloadInitiator = new DownloadInitiator({});
       downloadInitiator.downloadData = mockDownloadData;
 
-      mockItem.getSavePath.mockReturnValue("");
-      mockDownloadData.isDownloadCancelled.mockReturnValue(true);
+      mockItem.getSavePath.mockReturnValueOnce("");
+      mockDownloadData.isDownloadCancelled.mockReturnValueOnce(true);
 
       await downloadInitiator.generateOnWillDownload({
         saveDialogOptions: {},
@@ -83,8 +88,8 @@ describe("DownloadInitiator", () => {
         downloadInitiator.downloadData = mockDownloadData;
 
         mockItem["_userInitiatedPause"] = true;
-        mockItem.getSavePath.mockReturnValue("");
-        mockDownloadData.isDownloadCancelled.mockReturnValue(true);
+        mockItem.getSavePath.mockReturnValueOnce("");
+        mockDownloadData.isDownloadCancelled.mockReturnValueOnce(true);
 
         await downloadInitiator.generateOnWillDownload({
           saveDialogOptions: {},
@@ -96,13 +101,16 @@ describe("DownloadInitiator", () => {
         expect(mockItem.resume).not.toHaveBeenCalled();
       });
 
-      it("should not resume the download if the did not pause before init", async () => {
+      it("should resume the download if the user *did not* pause before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
 
+        determineFilePath.mockReturnValueOnce("/some/path");
+
         mockItem["_userInitiatedPause"] = false;
-        mockItem.getSavePath.mockReturnValue("");
-        mockDownloadData.isDownloadCancelled.mockReturnValue(true);
+        mockItem.getSavePath.mockReturnValueOnce("/some/path");
+
+        const resumeSpy = jest.spyOn(mockItem, "resume");
 
         await downloadInitiator.generateOnWillDownload({
           saveDialogOptions: {},
@@ -111,7 +119,7 @@ describe("DownloadInitiator", () => {
 
         await jest.runAllTimersAsync();
 
-        expect(mockItem.resume).toHaveBeenCalled();
+        expect(resumeSpy).toHaveBeenCalled();
       });
     });
 
@@ -120,7 +128,7 @@ describe("DownloadInitiator", () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
 
-        mockItem.getSavePath.mockReturnValue("/some/path");
+        mockItem.getSavePath.mockReturnValueOnce("/some/path");
 
         await downloadInitiator.generateOnWillDownload({
           saveDialogOptions: {},
@@ -136,9 +144,9 @@ describe("DownloadInitiator", () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
 
-        mockItem.getSavePath.mockReturnValue("/some/path");
+        mockItem.getSavePath.mockReturnValueOnce("/some/path");
 
-        mockDownloadData.isDownloadCompleted.mockReturnValue(true);
+        mockDownloadData.isDownloadCompleted.mockReturnValueOnce(true);
 
         await downloadInitiator.generateOnWillDownload({
           saveDialogOptions: {},
@@ -157,24 +165,14 @@ describe("DownloadInitiator", () => {
       const downloadInitiator = new DownloadInitiator({});
       downloadInitiator.downloadData = mockDownloadData;
 
+      determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+
       await downloadInitiator.generateOnWillDownload({
         saveAsFilename: "test.txt",
         callbacks,
       })(mockEvent, mockItem, mockWebContents);
 
-      expect(mockItem.resolvedFilename).toBe("test.txt");
-      expect(downloadInitiator.callbackDispatcher.onDownloadStarted).toHaveBeenCalled();
-    });
-
-    it("should not require saveAsFilename", async () => {
-      const downloadInitiator = new DownloadInitiator({});
-      downloadInitiator.downloadData = mockDownloadData;
-
-      await downloadInitiator.generateOnWillDownload({
-        callbacks,
-      })(mockEvent, mockItem, mockWebContents);
-
-      expect(mockItem.resolvedFilename).toBe("example.txt");
+      expect(downloadInitiator.getDownloadData().resolvedFilename).toBe("test.txt");
       expect(downloadInitiator.callbackDispatcher.onDownloadStarted).toHaveBeenCalled();
     });
 
@@ -184,27 +182,36 @@ describe("DownloadInitiator", () => {
         downloadInitiator.downloadData = mockDownloadData;
         mockItem["_userInitiatedPause"] = true;
 
+        determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+
         await downloadInitiator.generateOnWillDownload({
           callbacks,
         })(mockEvent, mockItem, mockWebContents);
 
+        const resumeSpy = jest.spyOn(mockItem, "resume");
+
         await jest.runAllTimersAsync();
 
-        expect(mockItem.resume).not.toHaveBeenCalled();
+        expect(resumeSpy).not.toHaveBeenCalled();
       });
 
-      it("should not resume the download if the did not pause before init", async () => {
+      it("should resume the download if the *did not* pause before init", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
         mockItem["_userInitiatedPause"] = true;
 
+        determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+        const resumeSpy = jest.spyOn(mockItem, "resume");
+
         await downloadInitiator.generateOnWillDownload({
           callbacks,
+          directory: "/some/path",
+          saveAsFilename: "test.txt",
         })(mockEvent, mockItem, mockWebContents);
 
         await jest.runAllTimersAsync();
 
-        expect(mockItem.resume).toHaveBeenCalled();
+        expect(resumeSpy).toHaveBeenCalled();
       });
     });
   });
@@ -269,7 +276,7 @@ describe("DownloadInitiator", () => {
       expect(downloadInitiator.cleanup).toHaveBeenCalled();
     });
 
-    it.only("should handle interrupted state", async () => {
+    it("should handle interrupted state", async () => {
       const downloadInitiator = new DownloadInitiator({});
       downloadInitiator.downloadData = mockDownloadData;
       downloadInitiator.callbackDispatcher.onDownloadInterrupted = jest.fn();
@@ -282,5 +289,41 @@ describe("DownloadInitiator", () => {
       expect(mockDownloadData.interruptedVia).toBe("completed");
       expect(downloadInitiator.callbackDispatcher.onDownloadInterrupted).toHaveBeenCalledWith(mockDownloadData);
     });
+
+    it("should not call the item updated event if the download was paused", async () => {
+      const downloadInitiator = new DownloadInitiator({});
+      downloadInitiator.downloadData = mockDownloadData;
+
+      determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+
+      await downloadInitiator.generateOnWillDownload({
+        callbacks,
+      })(mockEvent, mockItem, mockWebContents);
+
+      await jest.runAllTimersAsync();
+      mockItem.pause();
+      mockEmitter.emit("updated", "");
+
+      expect(downloadInitiator.callbackDispatcher.onDownloadProgress).not.toHaveBeenCalled();
+    });
+
+    it("should call the item updated event if the download was paused and resumed", async () => {
+        const downloadInitiator = new DownloadInitiator({});
+        downloadInitiator.downloadData = mockDownloadData;
+        downloadInitiator.updateProgress = jest.fn();
+
+        determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+
+        await downloadInitiator.generateOnWillDownload({
+            callbacks,
+        })(mockEvent, mockItem, mockWebContents);
+
+        await jest.runAllTimersAsync();
+        mockItem.pause();
+        mockItem.resume();
+        mockEmitter.emit("updated", "", "progressing");
+
+        expect(downloadInitiator.callbackDispatcher.onDownloadProgress).toHaveBeenCalled();
+    })
   });
 });

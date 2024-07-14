@@ -69,6 +69,7 @@ export class DownloadInitiator {
    */
   private downloadData: DownloadData;
   private config: Omit<WillOnDownloadParams, "callbacks">;
+  private onUpdateHandler?: (_event: Event, state: "progressing" | "interrupted") => void;
 
   constructor(config: DownloadInitiatorConstructorParams) {
     this.downloadData = new DownloadData();
@@ -165,7 +166,8 @@ export class DownloadInitiator {
         if (this.downloadData.isDownloadCompleted()) {
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
         } else {
-          item.on("updated", this.generateItemOnUpdated());
+          this.onUpdateHandler = this.generateItemOnUpdated();
+          item.on("updated", this.onUpdateHandler);
           item.once("done", this.generateItemOnDone());
         }
 
@@ -191,17 +193,26 @@ export class DownloadInitiator {
     const oldPause = item.pause.bind(item);
     item.pause = () => {
       item["_userInitiatedPause"] = true;
-      // Don't fire progress updates in a paused state
-      item.off("updated", this.generateItemOnUpdated());
+
+      if (this.onUpdateHandler) {
+        // Don't fire progress updates in a paused state
+        item.off("updated", this.onUpdateHandler);
+        this.onUpdateHandler = undefined;
+      }
+
       oldPause();
     };
 
-    const oldResume = item.resume.bind(item)
+    const oldResume = item.resume.bind(item);
 
     item.resume = () => {
-        item.on("updated", this.generateItemOnUpdated());
-        oldResume();
-    }
+      if (!this.onUpdateHandler) {
+        this.onUpdateHandler = this.generateItemOnUpdated();
+        item.on("updated", this.onUpdateHandler);
+      }
+
+      oldResume();
+    };
   }
 
   /**
@@ -221,7 +232,8 @@ export class DownloadInitiator {
 
     this.augmentDownloadItem(item);
     await this.callbackDispatcher.onDownloadStarted(this.downloadData);
-    item.on("updated", this.generateItemOnUpdated());
+    this.onUpdateHandler = this.generateItemOnUpdated();
+    item.on("updated", this.onUpdateHandler);
     item.once("done", this.generateItemOnDone());
 
     if (!item["_userInitiatedPause"]) {
@@ -308,5 +320,7 @@ export class DownloadInitiator {
     if (this.onCleanup) {
       this.onCleanup(this.downloadData);
     }
+
+    this.onUpdateHandler = undefined;
   }
 }

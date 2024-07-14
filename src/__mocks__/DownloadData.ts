@@ -25,6 +25,8 @@ export function createMockDownloadData() {
     on: itemEmitter.on.bind(itemEmitter) as DownloadItem["on"],
     // @ts-ignore
     once: itemEmitter.once.bind(itemEmitter) as DownloadItem["once"],
+    // @ts-ignore
+    off: itemEmitter.off.bind(itemEmitter) as DownloadItem["off"],
   };
 
   const downloadData: jest.Mocked<ActualDownloadData> = {
