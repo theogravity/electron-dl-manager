@@ -290,23 +290,6 @@ describe("DownloadInitiator", () => {
       expect(downloadInitiator.callbackDispatcher.onDownloadInterrupted).toHaveBeenCalledWith(mockDownloadData);
     });
 
-    it("should not call the item updated event if the download was paused", async () => {
-      const downloadInitiator = new DownloadInitiator({});
-      downloadInitiator.downloadData = mockDownloadData;
-
-      determineFilePath.mockReturnValueOnce("/some/path/test.txt");
-
-      await downloadInitiator.generateOnWillDownload({
-        callbacks,
-      })(mockEvent, mockItem, mockWebContents);
-
-      await jest.runAllTimersAsync();
-      mockItem.pause();
-      mockEmitter.emit("updated", "");
-
-      expect(downloadInitiator.callbackDispatcher.onDownloadProgress).not.toHaveBeenCalled();
-    });
-
     it("should call the item updated event if the download was paused and resumed", async () => {
         const downloadInitiator = new DownloadInitiator({});
         downloadInitiator.downloadData = mockDownloadData;
@@ -319,10 +302,13 @@ describe("DownloadInitiator", () => {
         })(mockEvent, mockItem, mockWebContents);
 
         await jest.runAllTimersAsync();
+
         mockItem.pause();
+        mockEmitter.emit("updated", "", "progressing");
+        expect(downloadInitiator.callbackDispatcher.onDownloadProgress).not.toHaveBeenCalled();
+
         mockItem.resume();
         mockEmitter.emit("updated", "", "progressing");
-
         expect(downloadInitiator.callbackDispatcher.onDownloadProgress).toHaveBeenCalled();
     })
   });
