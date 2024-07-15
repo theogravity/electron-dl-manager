@@ -1,3 +1,7 @@
+# 3.0.1 (2024-07-13)
+
+Do not emit progress events when `pause()` is called.
+
 # 3.0.0 (2024-04-04)
 
 Adds fixes around `DownloadData` population.
