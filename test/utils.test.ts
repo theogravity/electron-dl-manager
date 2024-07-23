@@ -8,8 +8,16 @@ import {
   getFilenameFromMime,
   truncateUrl,
 } from "../src/utils";
+import { createMockDownloadData } from "../src/__mocks__/DownloadData";
 
 jest.mock("electron");
+
+let mockedItemData;
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockedItemData = createMockDownloadData().item;
+});
 
 describe("truncateUrl", () => {
   test("it should truncate URL if longer than 50 characters", () => {
@@ -105,11 +113,14 @@ describe("calculateDownloadMetrics", () => {
   });
 
   it("calculates the download metrics correctly for positive elapsed time", () => {
-    const result = calculateDownloadMetrics({
-      totalBytes: 5000,
-      downloadedBytes: 1000,
-      startTimeSecs: mockStartTimeSecs,
-    });
+    mockedItemData.getReceivedBytes.mockReturnValue(1000);
+    mockedItemData.getTotalBytes.mockReturnValue(5000);
+    mockedItemData.getStartTime.mockReturnValue(mockStartTimeSecs);
+
+    mockedItemData["getCurrentBytesPerSecond"] = undefined;
+    mockedItemData["getPercentComplete"] = undefined;
+
+    const result = calculateDownloadMetrics(mockedItemData);
 
     expect(result).toEqual({
       percentCompleted: 20,
@@ -120,12 +131,14 @@ describe("calculateDownloadMetrics", () => {
 
   it("calculates zero download rate and estimated time if no time has elapsed", () => {
     const startTimeWithNoElapsedTime = 2000; // Mock current time is the same as start time
+    mockedItemData.getReceivedBytes.mockReturnValue(0);
+    mockedItemData.getTotalBytes.mockReturnValue(5000);
+    mockedItemData.getStartTime.mockReturnValue(startTimeWithNoElapsedTime);
 
-    const result = calculateDownloadMetrics({
-      totalBytes: 5000,
-      downloadedBytes: 0,
-      startTimeSecs: startTimeWithNoElapsedTime,
-    });
+    mockedItemData["getCurrentBytesPerSecond"] = undefined;
+    mockedItemData["getPercentComplete"] = undefined;
+
+    const result = calculateDownloadMetrics(mockedItemData);
 
     expect(result).toEqual({
       percentCompleted: 0,
@@ -135,22 +148,43 @@ describe("calculateDownloadMetrics", () => {
   });
 
   it("does not exceed 100% completion", () => {
-    const result = calculateDownloadMetrics({
-      totalBytes: 2000,
-      downloadedBytes: 5000, // More bytes downloaded than total, which could be an error
-      startTimeSecs: mockStartTimeSecs,
-    });
+    mockedItemData.getReceivedBytes.mockReturnValue(5000);
+    mockedItemData.getTotalBytes.mockReturnValue(2000);
+    mockedItemData.getStartTime.mockReturnValue(mockStartTimeSecs);
+
+    mockedItemData["getCurrentBytesPerSecond"] = undefined;
+    mockedItemData["getPercentComplete"] = undefined;
+
+    const result = calculateDownloadMetrics(mockedItemData);
 
     expect(result.percentCompleted).toBe(100);
   });
 
   it("handles zero totalBytes without errors and returns zero for percentCompleted", () => {
-    const result = calculateDownloadMetrics({
-      totalBytes: 0,
-      downloadedBytes: 1000,
-      startTimeSecs: mockStartTimeSecs,
-    });
+    mockedItemData.getReceivedBytes.mockReturnValue(1000);
+    mockedItemData.getTotalBytes.mockReturnValue(0);
+    mockedItemData.getStartTime.mockReturnValue(mockStartTimeSecs);
+
+    mockedItemData["getCurrentBytesPerSecond"] = undefined;
+    mockedItemData["getPercentComplete"] = undefined;
+
+    const result = calculateDownloadMetrics(mockedItemData);
 
     expect(result.percentCompleted).toBe(0);
+  });
+
+  describe("with getCurrentBytesPerSecond and getPercentComplete", () => {
+    it("calculates the download metrics correctly for positive elapsed time", () => {
+      mockedItemData.getCurrentBytesPerSecond.mockReturnValue(999);
+      mockedItemData.getPercentComplete.mockReturnValue(99);
+
+      const result = calculateDownloadMetrics(mockedItemData);
+
+      expect(result).toEqual({
+        percentCompleted: 99,
+        downloadRateBytesPerSecond: 999,
+        estimatedTimeRemainingSeconds: expect.any(Number),
+      });
+    });
   });
 });

@@ -244,17 +244,14 @@ export class DownloadInitiator {
   protected updateProgress() {
     const { item } = this.downloadData;
 
-    const input = {
-      downloadedBytes: item.getReceivedBytes(),
-      totalBytes: item.getTotalBytes(),
-      startTimeSecs: item.getStartTime(),
-    };
+    const metrics = calculateDownloadMetrics(item);
 
-    const metrics = calculateDownloadMetrics(input);
+    const downloadedBytes = item.getReceivedBytes();
+    const totalBytes = item.getTotalBytes();
 
-    if (input.downloadedBytes > input.totalBytes) {
+    if (downloadedBytes > item.getTotalBytes()) {
       // Note: This situation will happen when using data: URIs
-      this.log(`Downloaded bytes (${input.downloadedBytes}) is greater than total bytes (${input.totalBytes})`);
+      this.log(`Downloaded bytes (${downloadedBytes}) is greater than total bytes (${totalBytes})`);
     }
 
     this.downloadData.downloadRateBytesPerSecond = metrics.downloadRateBytesPerSecond;

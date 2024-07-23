@@ -291,25 +291,25 @@ describe("DownloadInitiator", () => {
     });
 
     it("should call the item updated event if the download was paused and resumed", async () => {
-        const downloadInitiator = new DownloadInitiator({});
-        downloadInitiator.downloadData = mockDownloadData;
-        downloadInitiator.updateProgress = jest.fn();
+      const downloadInitiator = new DownloadInitiator({});
+      downloadInitiator.downloadData = mockDownloadData;
+      downloadInitiator.updateProgress = jest.fn();
 
-        determineFilePath.mockReturnValueOnce("/some/path/test.txt");
+      determineFilePath.mockReturnValueOnce("/some/path/test.txt");
 
-        await downloadInitiator.generateOnWillDownload({
-            callbacks,
-        })(mockEvent, mockItem, mockWebContents);
+      await downloadInitiator.generateOnWillDownload({
+        callbacks,
+      })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+      await jest.runAllTimersAsync();
 
-        mockItem.pause();
-        mockEmitter.emit("updated", "", "progressing");
-        expect(downloadInitiator.callbackDispatcher.onDownloadProgress).not.toHaveBeenCalled();
+      mockItem.pause();
+      mockEmitter.emit("updated", "", "progressing");
+      expect(downloadInitiator.callbackDispatcher.onDownloadProgress).not.toHaveBeenCalled();
 
-        mockItem.resume();
-        mockEmitter.emit("updated", "", "progressing");
-        expect(downloadInitiator.callbackDispatcher.onDownloadProgress).toHaveBeenCalled();
-    })
+      mockItem.resume();
+      mockEmitter.emit("updated", "", "progressing");
+      expect(downloadInitiator.callbackDispatcher.onDownloadProgress).toHaveBeenCalled();
+    });
   });
 });
