@@ -1,3 +1,9 @@
+# 3.1.0 (2024-07-22)
+
+- If you are using Electron >= `30.3.0`, you will get native reporting on
+download percent and bytes per second via the Electron API instead of manual calculations.
+  * Provided via [this Electron PR](https://github.com/electron/electron/pull/42914)
+
 # 3.0.1 (2024-07-13)
 
 Do not emit progress events when `pause()` is called.
