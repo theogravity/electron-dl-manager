@@ -1,3 +1,8 @@
+# 3.1.1 (2024-07-31)
+
+- Added more debug logging
+- Added notes to `README.md` that `download()` *must* be called with `await` or weird things happen.
+
 # 3.1.0 (2024-07-22)
 
 - If you are using Electron >= `30.3.0`, you will get native reporting on
