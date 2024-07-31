@@ -33,7 +33,9 @@ export type DebugLoggerFn = (message: string) => void;
 
 export interface DownloadManagerConstructorParams {
   /**
-   * If defined, will log out internal debug messages
+   * If defined, will log out internal debug messages. Useful for
+   * troubleshooting downloads. Does not log out progress due to
+   * how frequent it can be.
    */
   debugLogger?: DebugLoggerFn;
 }
@@ -125,6 +127,8 @@ export interface IElectronDownloadManager {
    * the saveAs dialog will show up first.
    *
    * Returns the id of the download.
+   *
+   * This *must* be called with `await` or unintended behavior may occur.
    */
   download(params: DownloadConfig): Promise<string>;
   /**

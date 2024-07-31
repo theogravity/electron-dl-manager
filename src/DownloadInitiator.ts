@@ -288,13 +288,16 @@ export class DownloadInitiator {
     return async (_event: Event, state: "completed" | "cancelled" | "interrupted") => {
       switch (state) {
         case "completed": {
+          this.log(`Download completed. Total bytes: ${this.downloadData.item.getTotalBytes()}`);
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
           break;
         }
         case "cancelled":
+          this.log(`Download cancelled. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
           await this.callbackDispatcher.onDownloadCancelled(this.downloadData);
           break;
         case "interrupted":
+          this.log(`Download interrupted. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
           this.downloadData.interruptedVia = "completed";
           await this.callbackDispatcher.onDownloadInterrupted(this.downloadData);
           break;
@@ -310,6 +313,7 @@ export class DownloadInitiator {
     const { item } = this.downloadData;
 
     if (item) {
+      this.log("Cleaning up download item event listeners");
       item.removeListener("updated", this.onItemUpdated);
       item.removeListener("done", this.onItemDone);
     }
