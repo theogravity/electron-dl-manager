@@ -25,8 +25,6 @@ import { ElectronDownloadManager } from 'electron-dl-manager';
 const manager = new ElectronDownloadManager();
 
 // Start a download
-// You *must* call manager.download() with await or 
-// you may get unexpected behavior
 const id = await manager.download({
   window: browserWindowInstance,
   url: 'https://example.com/file.zip',
@@ -187,8 +185,6 @@ interface DownloadManagerConstructorParams {
 ### `download()`
 
 Starts a file download. Returns the `id` of the download.
-
-**You must call `download()` with `await` or you may get unexpected behavior.**
 
 ```typescript
 download(params: DownloadParams): Promise<string>

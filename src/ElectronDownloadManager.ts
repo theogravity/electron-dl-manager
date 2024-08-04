@@ -10,11 +10,33 @@ import type {
 import { truncateUrl } from "./utils";
 
 /**
+ * This is used to solve an issue where multiple downloads are started at the same time.
+ * For example, Promise.all([download1, download2, ...]) will start both downloads at the same
+ * time. This is problematic because the will-download event is not guaranteed to fire in the
+ * order that the downloads were started.
+ *
+ * So we use this to make sure that will-download fires in the order that the downloads were
+ * started by executing the downloads in a sequential fashion.
+ *
+ * For more information see:
+ * https://github.com/theogravity/electron-dl-manager/issues/11
+ */
+class DownloadQueue {
+  private promise = Promise.resolve() as unknown as Promise<string>;
+
+  add(task: () => Promise<string>): Promise<string> {
+    this.promise = this.promise.then(() => task());
+    return this.promise;
+  }
+}
+
+/**
  * Enables handling downloads in Electron.
  */
 export class ElectronDownloadManager implements IElectronDownloadManager {
   protected downloadData: Record<string, DownloadData>;
   protected logger: DebugLoggerFn;
+  private downloadQueue = new DownloadQueue();
 
   constructor(params: DownloadManagerConstructorParams = {}) {
     this.downloadData = {};
@@ -88,30 +110,33 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the id of the download.
    */
   async download(params: DownloadConfig): Promise<string> {
-    return new Promise((resolve, reject) => {
-      try {
-        if (params.saveAsFilename && params.saveDialogOptions) {
-          return reject(Error("You cannot define both saveAsFilename and saveDialogOptions to start a download"));
-        }
+    return this.downloadQueue.add(
+      () =>
+        new Promise<string>((resolve, reject) => {
+          try {
+            if (params.saveAsFilename && params.saveDialogOptions) {
+              return reject(Error("You cannot define both saveAsFilename and saveDialogOptions to start a download"));
+            }
 
-        const downloadInitiator = new DownloadInitiator({
-          debugLogger: this.logger,
-          onCleanup: (data) => {
-            this.cleanup(data);
-          },
-          onDownloadInit: (data) => {
-            this.downloadData[data.id] = data;
-            resolve(data.id);
-          },
-        });
+            const downloadInitiator = new DownloadInitiator({
+              debugLogger: this.logger,
+              onCleanup: (data) => {
+                this.cleanup(data);
+              },
+              onDownloadInit: (data) => {
+                this.downloadData[data.id] = data;
+                resolve(data.id);
+              },
+            });
 
-        this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
-        params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
-        params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
-      } catch (e) {
-        reject(e);
-      }
-    });
+            this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
+            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
+            params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
+          } catch (e) {
+            reject(e);
+          }
+        }),
+    );
   }
 
   protected cleanup(data: DownloadData) {
@@ -160,4 +185,17 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     });
     dbg.detach();
   }
+}
+
+function waitTicks(n: number): Promise<void> {
+  return new Promise((resolve) => {
+    function tick(count: number) {
+      if (count <= 0) {
+        resolve();
+      } else {
+        process.nextTick(() => tick(count - 1));
+      }
+    }
+    tick(n);
+  });
 }
