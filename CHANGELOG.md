@@ -1,3 +1,8 @@
+# 3.2.0 (2024-08-04)
+
+- Fix issues around starting multiple downloads at the same time.
+- No longer need to use `await` before a download call when multiple downloads are started at the same time.
+
 # 3.1.1 (2024-07-31)
 
 - Added more debug logging
