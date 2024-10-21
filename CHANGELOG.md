@@ -1,3 +1,7 @@
+# 3.2.1 (2024-10-21)
+
+- Add an FAQ section to `README.md` on how to handle invalid URLs
+
 # 3.2.0 (2024-08-04)
 
 - Fix issues around starting multiple downloads at the same time.

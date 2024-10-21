@@ -74,6 +74,7 @@ manager.resumeDownload(id);
     - [`isDownloadInterrupted()`](#isdownloadinterrupted)
     - [`isDownloadCompleted()`](#isdownloadcompleted)
 - [Mock class](#mock-class)
+- [FAQ](#faq)
 - [Acknowledgments](#acknowledgments)
 
 # Installation
@@ -352,7 +353,9 @@ class DownloadData {
    */
   resolvedFilename: string
   /**
-   * If true, the download was cancelled from the save as dialog
+   * If true, the download was cancelled from the save as dialog. This flag
+   * will also be true if the download was cancelled by the application when
+   * using the save as dialog.
    */
   cancelledFromSaveAsDialog?: boolean
   /**
@@ -454,6 +457,46 @@ isDownloadCompleted(): boolean
 If you need to mock out `ElectronDownloadManager` in your tests, you can use the `ElectronDownloadManagerMock` class.
 
 `import { ElectronDownloadManagerMock } from 'electron-dl-manager'`
+
+# FAQ
+
+## How do I capture if the download is invalid? `onError()` is not being called.
+
+Electron doesn't provide an explicit way to capture errors for downloads in general.
+What it does for invalid URLs, it will trigger the `onDownloadCancelled()` callback.
+
+```typescript
+const id = await manager.download({
+  window: mainWindow,
+  url: 'https://alkjsdflksjdflk.com/file.zip',
+  callbacks: {
+    onDownloadCancelled: async (...) => {
+      // Invalid download; this callback will be called
+    },
+  }
+});
+```
+
+A better way to handle this is to check if the URL exists prior to the download yourself.
+I couldn't find a library that I felt was reliable to include into this package,
+so it's best you find a library that works for you:
+
+- https://www.npmjs.com/search?q=url%20exists&ranking=maintenance
+
+GPT also suggests the following code (untested):
+
+```typescript
+async function urlExists(url: string): Promise<boolean> {
+  try {
+    const response = await fetch(url, { method: 'HEAD' });
+    return response.ok;
+  } catch (error) {
+    return false;
+  }
+}
+
+const exists = await urlExists('https://example.com/file.jpg');
+```
 
 # Acknowledgments
 

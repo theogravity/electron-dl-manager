@@ -5,3 +5,4 @@ test
 config
 __mocks__
 .github
+test-app

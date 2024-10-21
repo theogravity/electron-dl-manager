@@ -30,7 +30,9 @@ export class DownloadData {
    */
   resolvedFilename: string;
   /**
-   * If true, the download was cancelled from the save as dialog
+   * If true, the download was cancelled from the save as dialog. This flag
+   * will also be true if the download was cancelled by the application when
+   * using the save as dialog.
    */
   cancelledFromSaveAsDialog?: boolean;
   /**
