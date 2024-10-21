@@ -462,7 +462,12 @@ If you need to mock out `ElectronDownloadManager` in your tests, you can use the
 
 ## How do I capture if the download is invalid? `onError()` is not being called.
 
-Electron doesn't provide an explicit way to capture errors for downloads in general.
+Electron `DownloadItem` doesn't provide an explicit way to capture errors for downloads in general:
+
+https://www.electronjs.org/docs/latest/api/download-item#class-downloaditem
+
+(It only has `on('updated')` and `on('done')` events, which this library uses for defining the callback handlers.)
+
 What it does for invalid URLs, it will trigger the `onDownloadCancelled()` callback.
 
 ```typescript
