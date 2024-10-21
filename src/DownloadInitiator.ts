@@ -176,7 +176,7 @@ export class DownloadInitiator {
         }
       } else if (this.downloadData.isDownloadCancelled()) {
         clearInterval(interval);
-        this.log("Download was cancelled by user");
+        this.log("Download was cancelled");
         this.downloadData.cancelledFromSaveAsDialog = true;
         await this.callbackDispatcher.onDownloadCancelled(this.downloadData);
       } else {
