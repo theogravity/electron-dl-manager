@@ -142,47 +142,4 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   protected cleanup(data: DownloadData) {
     delete this.downloadData[data.id];
   }
-
-  /**
-   * Enables network throttling on a BrowserWindow. Settings apply to *all*
-   * transfers in the window, not just downloads. Settings may be persistent
-   * on application restart, so use `disableThrottle` to reset after you're done
-   * testing.
-   * @see https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-emulateNetworkConditions
-   * @see https://github.com/electron/electron/issues/21250
-   */
-  static async throttleConnections(
-    window: BrowserWindow,
-    conditions: {
-      offline?: boolean;
-      latency?: number;
-      downloadThroughput?: number;
-      uploadThroughput?: number;
-      connectionType?: string;
-      packetLoss?: number;
-      packetQueueLength?: number;
-      packetReordering?: number;
-    },
-  ) {
-    const dbg = window.webContents.debugger;
-    dbg.attach();
-    await dbg.sendCommand("Network.enable");
-    await dbg.sendCommand("Network.emulateNetworkConditions", conditions);
-  }
-
-  /**
-   * Disables network throttling on a BrowserWindow
-   */
-  static async disableThrottle(window: BrowserWindow) {
-    const dbg = window.webContents.debugger;
-    dbg.attach();
-    await dbg.sendCommand("Network.enable");
-    await dbg.sendCommand("Network.emulateNetworkConditions", {
-      offline: false,
-      downloadThroughput: -1,
-      uploadThroughput: -1,
-      latency: 0,
-    });
-    dbg.detach();
-  }
 }
