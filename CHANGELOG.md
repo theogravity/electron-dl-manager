@@ -1,3 +1,10 @@
+# 4.0.0 (2025-04-14)
+
+**Breaking Changes:**
+
+- Removes static methods `ElectronDownloadManager.throttleConnections()` and `ElectronDownloadManager.disableThrottle()` as they never
+  worked as intended.
+
 # 3.2.1 (2024-10-21)
 
 - Add an FAQ section to `README.md` on how to handle invalid URLs
