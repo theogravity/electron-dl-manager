@@ -9,6 +9,11 @@ interface DownloadInitiatorConstructorParams {
   debugLogger?: (message: string) => void;
   onCleanup?: (id: DownloadData) => void;
   onDownloadInit?: (id: DownloadData) => void;
+  onDownloadStarted?: (data: DownloadData) => void;
+  onDownloadProgress?: (data: DownloadData) => void;
+  onDownloadCompleted?: (data: DownloadData) => void;
+  onDownloadCancelled?: (data: DownloadData) => void;
+  onDownloadInterrupted?: (data: DownloadData) => void;
 }
 
 interface WillOnDownloadParams {
@@ -61,6 +66,14 @@ export class DownloadInitiator {
    */
   private onCleanup: (data: DownloadData) => void;
   /**
+   * Additional callback handlers
+   */
+  private onDownloadStarted: (data: DownloadData) => void;
+  private onDownloadProgress: (data: DownloadData) => void;
+  private onDownloadCompleted: (data: DownloadData) => void;
+  private onDownloadCancelled: (data: DownloadData) => void;
+  private onDownloadInterrupted: (data: DownloadData) => void;
+  /**
    * The callback dispatcher for handling download events.
    */
   private callbackDispatcher: CallbackDispatcher;
@@ -78,6 +91,11 @@ export class DownloadInitiator {
     this.onItemDone = () => Promise.resolve();
     this.onCleanup = config.onCleanup || (() => {});
     this.onDownloadInit = config.onDownloadInit || (() => {});
+    this.onDownloadStarted = config.onDownloadStarted || (() => {});
+    this.onDownloadProgress = config.onDownloadProgress || (() => {});
+    this.onDownloadCompleted = config.onDownloadCompleted || (() => {});
+    this.onDownloadCancelled = config.onDownloadCancelled || (() => {});
+    this.onDownloadInterrupted = config.onDownloadInterrupted || (() => {});
     this.config = {} as DownloadConfig;
     this.callbackDispatcher = {} as CallbackDispatcher;
   }
@@ -161,10 +179,12 @@ export class DownloadInitiator {
 
         this.augmentDownloadItem(item);
         await this.callbackDispatcher.onDownloadStarted(this.downloadData);
+        this.onDownloadStarted(this.downloadData);
         // If for some reason the above pause didn't work...
         // We'll manually call the completed handler
         if (this.downloadData.isDownloadCompleted()) {
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
+          this.onDownloadCompleted(this.downloadData);
         } else {
           this.onUpdateHandler = this.generateItemOnUpdated();
           item.on("updated", this.onUpdateHandler);
@@ -179,6 +199,7 @@ export class DownloadInitiator {
         this.log("Download was cancelled");
         this.downloadData.cancelledFromSaveAsDialog = true;
         await this.callbackDispatcher.onDownloadCancelled(this.downloadData);
+        this.onDownloadCancelled(this.downloadData);
       } else {
         this.log("Waiting for save path to be chosen by user");
       }
@@ -232,6 +253,7 @@ export class DownloadInitiator {
 
     this.augmentDownloadItem(item);
     await this.callbackDispatcher.onDownloadStarted(this.downloadData);
+    this.onDownloadStarted(this.downloadData);
     this.onUpdateHandler = this.generateItemOnUpdated();
     item.on("updated", this.onUpdateHandler);
     item.once("done", this.generateItemOnDone());
@@ -268,11 +290,13 @@ export class DownloadInitiator {
         case "progressing": {
           this.updateProgress();
           await this.callbackDispatcher.onDownloadProgress(this.downloadData);
+          this.onDownloadProgress(this.downloadData);
           break;
         }
         case "interrupted": {
           this.downloadData.interruptedVia = "in-progress";
           await this.callbackDispatcher.onDownloadInterrupted(this.downloadData);
+          this.onDownloadInterrupted(this.downloadData);
           break;
         }
         default:
@@ -290,16 +314,19 @@ export class DownloadInitiator {
         case "completed": {
           this.log(`Download completed. Total bytes: ${this.downloadData.item.getTotalBytes()}`);
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
+          this.onDownloadCompleted(this.downloadData);
           break;
         }
         case "cancelled":
           this.log(`Download cancelled. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
           await this.callbackDispatcher.onDownloadCancelled(this.downloadData);
+          this.onDownloadCancelled(this.downloadData);
           break;
         case "interrupted":
           this.log(`Download interrupted. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
           this.downloadData.interruptedVia = "completed";
           await this.callbackDispatcher.onDownloadInterrupted(this.downloadData);
+          this.onDownloadInterrupted(this.downloadData);
           break;
         default:
           this.log(`Unexpected itemOnDone state: ${state}`);

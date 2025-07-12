@@ -31,6 +31,33 @@ export type ErrorFn = (error: Error, data?: DownloadData) => Promise<void> | voi
  */
 export type DebugLoggerFn = (message: string) => void;
 
+/**
+ * Configuration for persisting download state
+ */
+export interface DownloadPersistenceConfig {
+  /**
+   * Project identifier for grouping downloads
+   */
+  projectId: string;
+  /**
+   * Unique file identifier within the project
+   */
+  fileId: string;
+  /**
+   * Package name or application identifier
+   */
+  packageName: string;
+  /**
+   * Original file size (if known beforehand)
+   */
+  originalFileSize?: number;
+  /**
+   * If true, automatically resume downloads from persisted state if found
+   * @default false
+   */
+  autoResume?: boolean;
+}
+
 export interface DownloadManagerConstructorParams {
   /**
    * If defined, will log out internal debug messages. Useful for
@@ -38,6 +65,11 @@ export interface DownloadManagerConstructorParams {
    * how frequent it can be.
    */
   debugLogger?: DebugLoggerFn;
+  /**
+   * If true, enables download state persistence for resuming interrupted downloads
+   * @default false
+   */
+  enablePersistence?: boolean;
 }
 
 export interface DownloadManagerCallbacks {
@@ -119,6 +151,10 @@ export interface DownloadConfig {
    * @default false
    */
   overwrite?: boolean;
+  /**
+   * Configuration for persisting download state (required if persistence is enabled)
+   */
+  persistenceConfig?: DownloadPersistenceConfig;
 }
 
 export interface IElectronDownloadManager {
@@ -151,4 +187,14 @@ export interface IElectronDownloadManager {
    * Returns the data for a download
    */
   getDownloadData(id: string): DownloadData | undefined;
+  /**
+   * Restores interrupted downloads from persistent state
+   * Only available if persistence is enabled
+   */
+  restoreInterruptedDownloads?(): Promise<string[]>;
+  /**
+   * Clears all persisted download states
+   * Only available if persistence is enabled
+   */
+  clearPersistedStates?(): void;
 }

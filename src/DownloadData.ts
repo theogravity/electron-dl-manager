@@ -52,6 +52,32 @@ export class DownloadData {
    */
   interruptedVia?: "in-progress" | "completed";
 
+  // Persistence-related fields
+  /**
+   * Project identifier for grouping downloads
+   */
+  projectId?: string;
+  /**
+   * Unique file identifier within the project
+   */
+  fileId?: string;
+  /**
+   * Package name or application identifier
+   */
+  packageName?: string;
+  /**
+   * Original file size (if known beforehand)
+   */
+  originalFileSize?: number;
+  /**
+   * Download URL
+   */
+  url?: string;
+  /**
+   * Start time timestamp
+   */
+  startTime?: number;
+
   constructor() {
     this.id = generateRandomId();
     this.resolvedFilename = "testFile.txt";
@@ -62,6 +88,7 @@ export class DownloadData {
     this.event = {} as Event;
     this.downloadRateBytesPerSecond = 0;
     this.estimatedTimeRemainingSeconds = 0;
+    this.startTime = Date.now();
   }
 
   isDownloadInProgress() {
