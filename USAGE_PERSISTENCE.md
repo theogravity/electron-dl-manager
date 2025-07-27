@@ -152,7 +152,7 @@ downloadStateManager.clearAllDownloadStates();
 ## Configuration Options
 
 ### DownloadPersistenceConfig
-- resumePreviousDownload?: boolean;
+- restorePreviousDownload?: boolean;
 
 ### PersistedDownloadState
 

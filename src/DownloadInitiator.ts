@@ -15,8 +15,9 @@ interface DownloadInitiatorConstructorParams {
   onDownloadCompleted?: (data: DownloadData) => void;
   onDownloadCancelled?: (data: DownloadData) => void;
   onDownloadInterrupted?: (data: DownloadData) => void;
+  onDownloadRestored?: (data: DownloadData) => void;
   downloadStateManager?: DownloadStateManager;
-  resumePreviousDownload?: boolean;
+  restorePreviousDownload?: boolean;
 }
 
 interface WillOnDownloadParams {
@@ -80,6 +81,7 @@ export class DownloadInitiator {
   private onDownloadCompleted: (data: DownloadData) => void;
   private onDownloadCancelled: (data: DownloadData) => void;
   private onDownloadInterrupted: (data: DownloadData) => void;
+  private onDownloadRestored: (data: DownloadData) => void;
   /**
    * The callback dispatcher for handling download events.
    */
@@ -91,7 +93,7 @@ export class DownloadInitiator {
   private config: Omit<WillOnDownloadParams, "callbacks">;
   private onUpdateHandler?: (_event: Event, state: "progressing" | "interrupted") => void;
   private downloadStateManager?: DownloadStateManager;
-  private resumePreviousDownload?: boolean;
+  private restorePreviousDownload?: boolean;
 
   constructor(config: DownloadInitiatorConstructorParams) {
     this.downloadData = new DownloadData();
@@ -105,10 +107,11 @@ export class DownloadInitiator {
     this.onDownloadCompleted = config.onDownloadCompleted || (() => {});
     this.onDownloadCancelled = config.onDownloadCancelled || (() => {});
     this.onDownloadInterrupted = config.onDownloadInterrupted || (() => {});
+    this.onDownloadRestored = config.onDownloadRestored || (() => {});
     this.config = {} as DownloadConfig;
     this.callbackDispatcher = {} as CallbackDispatcher;
     this.downloadStateManager = config.downloadStateManager;
-    this.resumePreviousDownload = config.resumePreviousDownload;
+    this.restorePreviousDownload = config.restorePreviousDownload;
   }
 
   protected log(message: string) {
@@ -145,23 +148,27 @@ export class DownloadInitiator {
       this.downloadData.webContents = webContents;
       this.downloadData.event = event;
 
-      if (this.downloadStateManager && this.resumePreviousDownload) {
+      if (this.downloadStateManager && this.restorePreviousDownload) {
         this.log(`Attempting to resume previous download`);
         const previousDownloadState = this.downloadStateManager.findPreviousDownloadState(item);
         if (previousDownloadState) {
           this.log(`Found previous download state: ${JSON.stringify(previousDownloadState)}`);
-          this.log(`${webContents.session}`);
+          try {
+          item.setSavePath(previousDownloadState.filePath);
+          this.downloadData.resolvedFilename = previousDownloadState.filePath;
+          webContents.session.once("will-download", this.generateOnWillDownloadRestored(downloadParams));
           webContents.session.createInterruptedDownload({
-            path: previousDownloadState.filePath,
-            urlChain: previousDownloadState.urlChain,
-            mimeType: previousDownloadState.mimeType,
-            eTag: previousDownloadState.etag,
-            offset: previousDownloadState.receivedBytes,
-            length: previousDownloadState.totalBytes,
-          });
+              path: previousDownloadState.filePath,
+              urlChain: previousDownloadState.urlChain,
+              mimeType: previousDownloadState.mimeType,
+              eTag: previousDownloadState.etag,
+              offset: previousDownloadState.receivedBytes,
+              length: previousDownloadState.totalBytes,
+            });
+          } catch (error) {
+            this.log(`Error creating interrupted download: ${error}`);
+          }
           this.log(`Created interrupted download for ${JSON.stringify(item)}`);
-          this.log(`Calling generateOnWillDownload again with JSON.stringify(${this})`);
-          webContents.session.once("will-download", this.generateOnWillDownloadResumed(downloadParams).bind(this));
           return;
         }
         this.log(`No previous download state found`);
@@ -184,14 +191,15 @@ export class DownloadInitiator {
    * Generates the handler that attaches to the session `will-download` event,
    * which will execute the workflows for handling a resumed download.
    */
-  generateOnWillDownloadResumed(downloadParams: WillOnDownloadParams) {
+  generateOnWillDownloadRestored(downloadParams: WillOnDownloadParams) {
     this.config = downloadParams;
     this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, downloadParams.callbacks, this.logger);
 
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       this.log(`Recovering interrupted download for ${JSON.stringify(item)}`);
       this.downloadData.item = item;
-      this.initResumedDownload();
+      this.onDownloadRestored(this.downloadData);
+      this.initRestoreDownload();
       return;
     };
   }
@@ -317,7 +325,7 @@ export class DownloadInitiator {
   /**
    * Flow for handling a resumed download.
    */
-  protected async initResumedDownload() {
+  protected async initRestoreDownload() {
     const { item } = this.downloadData;
     
     this.log(`Resuming download for ${this.downloadData.resolvedFilename}`);
@@ -333,6 +341,8 @@ export class DownloadInitiator {
     if (!item["_userInitiatedPause"]) {
       item.resume();
     }
+
+    item.pause();
   }
 
   protected updateProgress() {

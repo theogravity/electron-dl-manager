@@ -143,8 +143,8 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
             }
 
             const downloadInitiator = new DownloadInitiator({
-              resumePreviousDownload: params.persistenceConfig?.resumePreviousDownload,
-              downloadStateManager: params.persistenceConfig?.resumePreviousDownload ? this.downloadStateManager : undefined,
+              restorePreviousDownload: params.persistenceConfig?.restorePreviousDownload,
+              downloadStateManager: params.persistenceConfig?.restorePreviousDownload ? this.downloadStateManager : undefined,
               debugLogger: this.logger,
               onCleanup: (data) => {
                 this.cleanup(data);
@@ -188,6 +188,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 if (this.enablePersistence) {
                   this.updatePersistedState(data, { status: 'interrupted' });
                 }
+              },
+              onDownloadRestored: (data) => {
+                this.log(`[${data.id}] Download restored`);
+                params.callbacks.onDownloadRestored?.(data);
               },
             });
 

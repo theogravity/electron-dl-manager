@@ -22,6 +22,10 @@ export type DownloadCompletedFn = (data: DownloadData) => Promise<void> | void;
  */
 export type DownloadInterruptedFn = (data: DownloadData) => Promise<void> | void;
 /**
+ * The download has been restored
+ */
+export type DownloadRestoredFn = (data: DownloadData) => Promise<void> | void;
+/**
  * The download has failed
  */
 export type ErrorFn = (error: Error, data?: DownloadData) => Promise<void> | void;
@@ -91,6 +95,11 @@ export interface DownloadManagerCallbacks {
    */
   onDownloadInterrupted?: DownloadInterruptedFn;
   /**
+   * When the download has been restored. This is called when a download
+   * is resumed from a previous state.
+   */
+  onDownloadRestored?: DownloadRestoredFn;
+  /**
    * When an error has been encountered.
    * Note: The signature is (error, <maybe some data>).
    */
@@ -144,7 +153,7 @@ export interface DownloadConfig {
    * Configuration for persisting download state (required if persistence is enabled)
    */
   persistenceConfig?: {
-    resumePreviousDownload?: boolean;
+    restorePreviousDownload?: boolean;
   };
   /**
    * Information for resuming an interrupted download (internal use)
