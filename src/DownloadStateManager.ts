@@ -15,7 +15,6 @@ export interface PersistedDownloadState {
   startTime: number;
   lastUpdateTime: number;
   status: 'downloading' | 'paused' | 'interrupted' | 'completed' | 'cancelled';
-  originalFileSize: number;
 }
 
 export interface DownloadStateManager {

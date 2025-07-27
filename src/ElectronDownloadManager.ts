@@ -143,6 +143,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
             }
 
             const downloadInitiator = new DownloadInitiator({
+              resumePreviousDownload: params.persistenceConfig?.resumePreviousDownload,
               downloadStateManager: params.persistenceConfig?.resumePreviousDownload ? this.downloadStateManager : undefined,
               debugLogger: this.logger,
               onCleanup: (data) => {
@@ -285,7 +286,6 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       startTime: data.startTime || Date.now(),
       lastUpdateTime: Date.now(),
       status: 'downloading',
-      originalFileSize: data.originalFileSize || 0,
     };
 
     this.downloadStateManager.saveDownloadState(state);

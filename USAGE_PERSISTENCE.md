@@ -152,12 +152,7 @@ downloadStateManager.clearAllDownloadStates();
 ## Configuration Options
 
 ### DownloadPersistenceConfig
-
-- `projectId`: Unique identifier for your project/application
-- `fileId`: Unique identifier for the specific file being downloaded
-- `packageName`: Your application's package name
-- `originalFileSize`: (Optional) Expected file size if known beforehand
-- `autoResume`: (Optional) If true, automatically resume downloads from persisted state if found (default: false)
+- resumePreviousDownload?: boolean;
 
 ### PersistedDownloadState
 

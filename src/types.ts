@@ -42,7 +42,6 @@ export interface ResumeDownloadInfo {
   etag: string;
   offset: number;
   length: number;
-  originalFileSize: number;
   fileName: string;
   url: string;
   startTime: number;
