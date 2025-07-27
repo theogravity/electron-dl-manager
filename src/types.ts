@@ -32,33 +32,6 @@ export type ErrorFn = (error: Error, data?: DownloadData) => Promise<void> | voi
 export type DebugLoggerFn = (message: string) => void;
 
 /**
- * Configuration for persisting download state
- */
-export interface DownloadPersistenceConfig {
-  /**
-   * Project identifier for grouping downloads
-   */
-  projectId: string;
-  /**
-   * Unique file identifier within the project
-   */
-  fileId: string;
-  /**
-   * Package name or application identifier
-   */
-  packageName: string;
-  /**
-   * Original file size (if known beforehand)
-   */
-  originalFileSize?: number;
-  /**
-   * If true, automatically resume downloads from persisted state if found
-   * @default false
-   */
-  autoResume?: boolean;
-}
-
-/**
  * Information needed to resume an interrupted download
  */
 export interface ResumeDownloadInfo {
@@ -69,9 +42,6 @@ export interface ResumeDownloadInfo {
   etag: string;
   offset: number;
   length: number;
-  projectId: string;
-  fileId: string;
-  packageName: string;
   originalFileSize: number;
   fileName: string;
   url: string;
@@ -174,7 +144,9 @@ export interface DownloadConfig {
   /**
    * Configuration for persisting download state (required if persistence is enabled)
    */
-  persistenceConfig?: DownloadPersistenceConfig;
+  persistenceConfig?: {
+    resumePreviousDownload?: boolean;
+  };
   /**
    * Information for resuming an interrupted download (internal use)
    */

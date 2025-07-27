@@ -1,14 +1,11 @@
-import { app } from 'electron';
+import { app, DownloadItem } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { DebugLoggerFn } from './types';
 
 export interface PersistedDownloadState {
   id: string;
-  projectId: string;
-  fileId: string;
   fileName: string;
-  url: string;
   urlChain: string[];
   filePath: string;
   mimeType?: string;
@@ -18,12 +15,12 @@ export interface PersistedDownloadState {
   startTime: number;
   lastUpdateTime: number;
   status: 'downloading' | 'paused' | 'interrupted' | 'completed' | 'cancelled';
-  packageName: string;
   originalFileSize: number;
 }
 
 export interface DownloadStateManager {
   saveDownloadState: (state: PersistedDownloadState) => void;
+  findPreviousDownloadState: (item: DownloadItem) => PersistedDownloadState | undefined;
   getDownloadState: (id: string) => PersistedDownloadState | undefined;
   getAllDownloadStates: () => PersistedDownloadState[];
   removeDownloadState: (id: string) => void;
@@ -80,6 +77,11 @@ export default class DownloadStateManagerImpl implements DownloadStateManager {
     this.logger(`DownloadStateManager: Saving download state for ${state.id} (${state.fileName}): ${JSON.stringify(state)}`);
     this.downloadStates.set(state.id, state);
     this.saveStates();
+  }
+
+  findPreviousDownloadState(item: DownloadItem): PersistedDownloadState | undefined {
+    const states = Array.from(this.downloadStates.values());
+    return states.find(state => state.etag === item.getETag() && state.status !== 'completed' && state.status !== 'downloading');
   }
 
   getDownloadState(id: string): PersistedDownloadState | undefined {

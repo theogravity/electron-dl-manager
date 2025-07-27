@@ -4,6 +4,7 @@ import { CallbackDispatcher } from "./CallbackDispatcher";
 import { DownloadData } from "./DownloadData";
 import type { DownloadConfig, DownloadManagerCallbacks, ResumeDownloadInfo } from "./types";
 import { calculateDownloadMetrics, determineFilePath } from "./utils";
+import type { DownloadStateManager } from "./DownloadStateManager";
 
 interface DownloadInitiatorConstructorParams {
   debugLogger?: (message: string) => void;
@@ -14,6 +15,8 @@ interface DownloadInitiatorConstructorParams {
   onDownloadCompleted?: (data: DownloadData) => void;
   onDownloadCancelled?: (data: DownloadData) => void;
   onDownloadInterrupted?: (data: DownloadData) => void;
+  downloadStateManager?: DownloadStateManager;
+  resumePreviousDownload?: boolean;
 }
 
 interface WillOnDownloadParams {
@@ -87,6 +90,8 @@ export class DownloadInitiator {
   private downloadData: DownloadData;
   private config: Omit<WillOnDownloadParams, "callbacks">;
   private onUpdateHandler?: (_event: Event, state: "progressing" | "interrupted") => void;
+  private downloadStateManager?: DownloadStateManager;
+  private resumePreviousDownload?: boolean;
 
   constructor(config: DownloadInitiatorConstructorParams) {
     this.downloadData = new DownloadData();
@@ -102,6 +107,8 @@ export class DownloadInitiator {
     this.onDownloadInterrupted = config.onDownloadInterrupted || (() => {});
     this.config = {} as DownloadConfig;
     this.callbackDispatcher = {} as CallbackDispatcher;
+    this.downloadStateManager = config.downloadStateManager;
+    this.resumePreviousDownload = config.resumePreviousDownload;
   }
 
   protected log(message: string) {
@@ -132,33 +139,36 @@ export class DownloadInitiator {
 
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       item.pause();
+      // This is an interrupted download that needs to be resumed
+      if (item.getState() === 'interrupted') {
+        this.log(`Recovering interrupted download for ${JSON.stringify(item)}`);
+        this.initResumedDownload();
+        return;
+      }
+
       this.log(`Download initiated for ${JSON.stringify(item)} ${JSON.stringify(event)}`);
       this.downloadData.item = item;
       this.downloadData.webContents = webContents;
       this.downloadData.event = event;
 
-      // If this is a resumed download, populate the download data with resume info
-      if (this.config.resumeInfo) {
-        this.downloadData.id = this.config.resumeInfo.id;
-        this.downloadData.resolvedFilename = this.config.resumeInfo.fileName;
-        this.downloadData.projectId = this.config.resumeInfo.projectId;
-        this.downloadData.fileId = this.config.resumeInfo.fileId;
-        this.downloadData.packageName = this.config.resumeInfo.packageName;
-        this.downloadData.originalFileSize = this.config.resumeInfo.originalFileSize;
-        this.downloadData.url = this.config.resumeInfo.url;
-        this.downloadData.startTime = this.config.resumeInfo.startTime;
-        
-        // Update the callback dispatcher with the correct ID
-        this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, downloadParams.callbacks, this.logger);
+      if (this.downloadStateManager && this.resumePreviousDownload) {
+        const previousDownloadState = this.downloadStateManager.findPreviousDownloadState(item);
+        if (previousDownloadState) {
+          webContents.session.createInterruptedDownload({
+            path: previousDownloadState.filePath,
+            urlChain: previousDownloadState.urlChain,
+            mimeType: previousDownloadState.mimeType,
+            eTag: previousDownloadState.etag,
+            offset: previousDownloadState.receivedBytes,
+            length: previousDownloadState.totalBytes,
+          });
+          webContents.session.once("will-download", this.generateOnWillDownload(downloadParams));
+          return;
+        }
       }
 
       if (this.onDownloadInit) {
         this.onDownloadInit(this.downloadData);
-      }
-
-      if (this.config.resumeInfo) {
-        await this.initResumedDownload();
-        return;
       }
 
       if (this.config.saveDialogOptions) {

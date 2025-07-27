@@ -6,9 +6,7 @@ import type {
   DebugLoggerFn,
   DownloadConfig,
   DownloadManagerConstructorParams,
-  DownloadPersistenceConfig,
   IElectronDownloadManager,
-  ResumeDownloadInfo,
 } from "./types";
 import { truncateUrl } from "./utils";
 
@@ -144,48 +142,12 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               return reject(Error("persistenceConfig is required when persistence is enabled"));
             }
 
-            // Check for auto-resume functionality
-            let resumeInfo: ResumeDownloadInfo | undefined;
-            if (this.enablePersistence && params.persistenceConfig?.autoResume) {
-              const existingState = this.findExistingDownloadState(params.persistenceConfig);
-              this.log(`[${params.persistenceConfig.fileId}] Existing state: ${JSON.stringify(existingState)}`);
-              
-              if (existingState && existingState.status !== 'completed' && existingState.status !== 'cancelled' && existingState.etag && existingState.totalBytes && existingState.mimeType && existingState.urlChain && existingState.filePath) {
-                this.log(`Found existing download state for ${params.persistenceConfig.fileId}, attempting to resume`);
-                resumeInfo = {
-                  id: existingState.id,
-                  filePath: existingState.filePath,
-                  urlChain: existingState.urlChain,
-                  mimeType: existingState.mimeType,
-                  etag: existingState.etag,
-                  offset: existingState.receivedBytes,
-                  length: existingState.totalBytes,
-                  projectId: existingState.projectId,
-                  fileId: existingState.fileId,
-                  packageName: existingState.packageName,
-                  originalFileSize: existingState.originalFileSize,
-                  fileName: existingState.fileName,
-                  url: existingState.url,
-                  startTime: existingState.startTime
-                };
-              }
-            }
-
             const downloadInitiator = new DownloadInitiator({
               debugLogger: this.logger,
               onCleanup: (data) => {
                 this.cleanup(data);
               },
-              onDownloadInit: (data) => {
-                // Add persistence metadata for new downloads
-                if (this.enablePersistence && params.persistenceConfig && !resumeInfo) {
-                  data.projectId = params.persistenceConfig.projectId;
-                  data.fileId = params.persistenceConfig.fileId;
-                  data.packageName = params.persistenceConfig.packageName;
-                  data.originalFileSize = params.persistenceConfig.originalFileSize;
-                  data.url = params.url;
-                }
-                
+              onDownloadInit: (data) => {                
                 this.downloadData[data.id] = data;
                 resolve(data.id);
               },
@@ -227,26 +189,9 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               },
             });
 
-            // Create the config with resume info if applicable
-            const downloadConfig = { ...params, resumeInfo };
-
             this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
-            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(downloadConfig));
-            
-            // If resuming, use createInterruptedDownload, otherwise use downloadURL
-            if (resumeInfo) {
-              this.log(`[${resumeInfo.id}] Using createInterruptedDownload to resume from ${resumeInfo.offset}/${resumeInfo.length} bytes`);
-              params.window.webContents.session.createInterruptedDownload({
-                path: resumeInfo.filePath,
-                urlChain: resumeInfo.urlChain,
-                mimeType: resumeInfo.mimeType,
-                eTag: resumeInfo.etag,
-                offset: resumeInfo.offset,
-                length: resumeInfo.length,
-              });
-            } else {
-              params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
-            }
+            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
+            params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
           } catch (e) {
             reject(e);
           }
@@ -272,7 +217,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
     for (const state of incompleteDownloads) {
       try {
-        this.log(`[${state.id}] Found interrupted download: ${truncateUrl(state.url)}`);
+        this.log(`[${state.id}] Found interrupted download`);
         
         // For now, we'll just track the interrupted downloads
         // The actual restoration would need to be implemented by the consumer
@@ -311,17 +256,25 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     const mimeType = data.item.getMimeType();
     const urlChain = data.item.getURLChain();
     const filePath = data.item.getSavePath();
-    if (!data.item || !data.projectId || !data.fileId || !data.packageName || !data.url || !eTag || !totalBytes || !mimeType || !urlChain || !filePath) {
-      this.log(`[${data.id}] Missing required persistence data, skipping state save`);
+    if (!data.item || !eTag || !totalBytes || !mimeType || !urlChain || !filePath) {
+      const requiredFields = [
+        { name: 'item', value: data.item },
+        { name: 'eTag', value: eTag },
+        { name: 'totalBytes', value: totalBytes },
+        { name: 'mimeType', value: mimeType },
+        { name: 'urlChain', value: urlChain },
+        { name: 'filePath', value: filePath }
+      ];
+      
+      const missing = requiredFields.filter(field => !field.value).map(field => field.name);
+      
+      this.log(`[${data.id}] Missing required persistence data: ${missing.join(', ')}, skipping state save`);
       return;
     }
 
     const state: PersistedDownloadState = {
       id: data.id,
-      projectId: data.projectId,
-      fileId: data.fileId,
       fileName: data.resolvedFilename,
-      url: data.url,
       urlChain: data.item.getURLChain(),
       filePath: data.item.getSavePath(),
       mimeType: data.item.getMimeType(),
@@ -331,7 +284,6 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       startTime: data.startTime || Date.now(),
       lastUpdateTime: Date.now(),
       status: 'downloading',
-      packageName: data.packageName,
       originalFileSize: data.originalFileSize || 0,
     };
 
@@ -341,14 +293,5 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
 
   private updatePersistedState(data: DownloadData, updates: Partial<PersistedDownloadState>): void {
     this.downloadStateManager.updateDownloadState(data.id, updates);
-  }
-
-  private findExistingDownloadState(persistenceConfig: DownloadPersistenceConfig): PersistedDownloadState | undefined {
-    const allStates = this.downloadStateManager.getAllDownloadStates();
-    return allStates.find(state => 
-      state.projectId === persistenceConfig.projectId &&
-      state.fileId === persistenceConfig.fileId &&
-      state.packageName === persistenceConfig.packageName
-    );
   }
 }
