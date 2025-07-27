@@ -130,6 +130,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the id of the download.
    */
   async download(params: DownloadConfig): Promise<string> {
+    this.log(`[${params.url}] Downloading ${params.url}`);
     return this.downloadQueue.add(
       () =>
         new Promise<string>((resolve, reject) => {
@@ -191,7 +192,9 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               },
               onDownloadRestored: (data) => {
                 this.log(`[${data.id}] Download restored`);
+                this.downloadData[data.id] = data;
                 params.callbacks.onDownloadRestored?.(data);
+                resolve(data.id);
               },
             });
 

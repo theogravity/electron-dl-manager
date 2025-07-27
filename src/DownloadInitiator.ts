@@ -156,6 +156,7 @@ export class DownloadInitiator {
           try {
           item.setSavePath(previousDownloadState.filePath);
           this.downloadData.resolvedFilename = previousDownloadState.filePath;
+          this.downloadData.id = previousDownloadState.id;
           webContents.session.once("will-download", this.generateOnWillDownloadRestored(downloadParams));
           webContents.session.createInterruptedDownload({
               path: previousDownloadState.filePath,
