@@ -152,8 +152,10 @@ export class DownloadInitiator {
       this.downloadData.event = event;
 
       if (this.downloadStateManager && this.resumePreviousDownload) {
+        this.log(`Attempting to resume previous download`);
         const previousDownloadState = this.downloadStateManager.findPreviousDownloadState(item);
         if (previousDownloadState) {
+          this.log(`Found previous download state: ${JSON.stringify(previousDownloadState)}`);
           webContents.session.createInterruptedDownload({
             path: previousDownloadState.filePath,
             urlChain: previousDownloadState.urlChain,
@@ -165,6 +167,7 @@ export class DownloadInitiator {
           webContents.session.once("will-download", this.generateOnWillDownload(downloadParams));
           return;
         }
+        this.log(`No previous download state found`);
       }
 
       if (this.onDownloadInit) {

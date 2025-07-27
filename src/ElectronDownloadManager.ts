@@ -143,6 +143,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
             }
 
             const downloadInitiator = new DownloadInitiator({
+              downloadStateManager: params.persistenceConfig?.resumePreviousDownload ? this.downloadStateManager : undefined,
               debugLogger: this.logger,
               onCleanup: (data) => {
                 this.cleanup(data);
