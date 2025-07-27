@@ -210,14 +210,14 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 if (this.enablePersistence) {
                   this.updatePersistedState(data, { status: 'completed' });
                   // Remove from persistent state since it's completed
-                  downloadStateManager.removeDownloadState(data.id);
+                  this.downloadStateManager.removeDownloadState(data.id);
                 }
               },
               onDownloadCancelled: (data) => {
                 if (this.enablePersistence) {
                   this.updatePersistedState(data, { status: 'cancelled' });
                   // Remove from persistent state since it's cancelled
-                  downloadStateManager.removeDownloadState(data.id);
+                  this.downloadStateManager.removeDownloadState(data.id);
                 }
               },
               onDownloadInterrupted: (data) => {
@@ -263,7 +263,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       throw new Error("Persistence is not enabled");
     }
 
-    const allStates = downloadStateManager.getAllDownloadStates();
+    const allStates = this.downloadStateManager.getAllDownloadStates();
     const incompleteDownloads = allStates.filter(
       (state) => state.status === 'downloading' || state.status === 'paused' || state.status === 'interrupted'
     );
@@ -297,7 +297,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       throw new Error("Persistence is not enabled");
     }
     
-    downloadStateManager.clearAllDownloadStates();
+    this.downloadStateManager.clearAllDownloadStates();
     this.log("Cleared all persisted download states");
   }
 
@@ -335,24 +335,20 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       originalFileSize: data.originalFileSize || 0,
     };
 
-    downloadStateManager.saveDownloadState(state);
+    this.downloadStateManager.saveDownloadState(state);
     this.log(`[${data.id}] Saved initial download state with ETag: ${state.etag || 'none'}`);
   }
 
   private updatePersistedState(data: DownloadData, updates: Partial<PersistedDownloadState>): void {
-    downloadStateManager.updateDownloadState(data.id, updates);
+    this.downloadStateManager.updateDownloadState(data.id, updates);
   }
 
   private findExistingDownloadState(persistenceConfig: DownloadPersistenceConfig): PersistedDownloadState | undefined {
-    const allStates = downloadStateManager.getAllDownloadStates();
+    const allStates = this.downloadStateManager.getAllDownloadStates();
     return allStates.find(state => 
       state.projectId === persistenceConfig.projectId &&
       state.fileId === persistenceConfig.fileId &&
       state.packageName === persistenceConfig.packageName
     );
   }
-
-
-
-
 }
