@@ -1,13 +1,14 @@
 import type { BrowserWindow } from "electron";
 import { DownloadData } from "./DownloadData";
 import { DownloadInitiator } from "./DownloadInitiator";
-import { downloadStateManager, type PersistedDownloadState } from "./DownloadStateManager";
+import DownloadStateManager, { type PersistedDownloadState } from "./DownloadStateManager";
 import type {
   DebugLoggerFn,
   DownloadConfig,
   DownloadManagerConstructorParams,
   DownloadPersistenceConfig,
   IElectronDownloadManager,
+  ResumeDownloadInfo,
 } from "./types";
 import { truncateUrl } from "./utils";
 
@@ -40,11 +41,13 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   protected logger: DebugLoggerFn;
   protected enablePersistence: boolean;
   private downloadQueue = new DownloadQueue();
+  private downloadStateManager: DownloadStateManager;
 
   constructor(params: DownloadManagerConstructorParams = {}) {
     this.downloadData = {};
     this.logger = params.debugLogger || (() => {});
     this.enablePersistence = params.enablePersistence || false;
+    this.downloadStateManager = new DownloadStateManager(this.logger);
   }
 
   protected log(message: string) {
@@ -142,11 +145,29 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
             }
 
             // Check for auto-resume functionality
+            let resumeInfo: ResumeDownloadInfo | undefined;
             if (this.enablePersistence && params.persistenceConfig?.autoResume) {
               const existingState = this.findExistingDownloadState(params.persistenceConfig);
-              if (existingState && existingState.status !== 'completed' && existingState.status !== 'cancelled') {
+              this.log(`[${params.persistenceConfig.fileId}] Existing state: ${JSON.stringify(existingState)}`);
+              
+              if (existingState && existingState.status !== 'completed' && existingState.status !== 'cancelled' && existingState.etag && existingState.totalBytes && existingState.mimeType && existingState.urlChain && existingState.filePath) {
                 this.log(`Found existing download state for ${params.persistenceConfig.fileId}, attempting to resume`);
-                return this.resumeExistingDownload(existingState, params, resolve, reject);
+                resumeInfo = {
+                  id: existingState.id,
+                  filePath: existingState.filePath,
+                  urlChain: existingState.urlChain,
+                  mimeType: existingState.mimeType,
+                  etag: existingState.etag,
+                  offset: existingState.receivedBytes,
+                  length: existingState.totalBytes,
+                  projectId: existingState.projectId,
+                  fileId: existingState.fileId,
+                  packageName: existingState.packageName,
+                  originalFileSize: existingState.originalFileSize,
+                  fileName: existingState.fileName,
+                  url: existingState.url,
+                  startTime: existingState.startTime
+                };
               }
             }
 
@@ -156,8 +177,8 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
                 this.cleanup(data);
               },
               onDownloadInit: (data) => {
-                // Add persistence metadata
-                if (this.enablePersistence && params.persistenceConfig) {
+                // Add persistence metadata for new downloads
+                if (this.enablePersistence && params.persistenceConfig && !resumeInfo) {
                   data.projectId = params.persistenceConfig.projectId;
                   data.fileId = params.persistenceConfig.fileId;
                   data.packageName = params.persistenceConfig.packageName;
@@ -206,9 +227,26 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               },
             });
 
+            // Create the config with resume info if applicable
+            const downloadConfig = { ...params, resumeInfo };
+
             this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
-            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
-            params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
+            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(downloadConfig));
+            
+            // If resuming, use createInterruptedDownload, otherwise use downloadURL
+            if (resumeInfo) {
+              this.log(`[${resumeInfo.id}] Using createInterruptedDownload to resume from ${resumeInfo.offset}/${resumeInfo.length} bytes`);
+              params.window.webContents.session.createInterruptedDownload({
+                path: resumeInfo.filePath,
+                urlChain: resumeInfo.urlChain,
+                mimeType: resumeInfo.mimeType,
+                eTag: resumeInfo.etag,
+                offset: resumeInfo.offset,
+                length: resumeInfo.length,
+              });
+            } else {
+              params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
+            }
           } catch (e) {
             reject(e);
           }
@@ -268,7 +306,12 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   }
 
   private saveInitialPersistedState(data: DownloadData): void {
-    if (!data.item || !data.projectId || !data.fileId || !data.packageName || !data.url) {
+    const eTag = data.item.getETag();
+    const totalBytes = data.item.getTotalBytes();
+    const mimeType = data.item.getMimeType();
+    const urlChain = data.item.getURLChain();
+    const filePath = data.item.getSavePath();
+    if (!data.item || !data.projectId || !data.fileId || !data.packageName || !data.url || !eTag || !totalBytes || !mimeType || !urlChain || !filePath) {
       this.log(`[${data.id}] Missing required persistence data, skipping state save`);
       return;
     }
@@ -282,7 +325,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       urlChain: data.item.getURLChain(),
       filePath: data.item.getSavePath(),
       mimeType: data.item.getMimeType(),
-      etag: data.item.getETag(), // Using getETag() as requested
+      etag: data.item.getETag(),
       totalBytes: data.item.getTotalBytes(),
       receivedBytes: data.item.getReceivedBytes(),
       startTime: data.startTime || Date.now(),
@@ -309,137 +352,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     );
   }
 
-  private resumeExistingDownload(
-    existingState: PersistedDownloadState,
-    params: DownloadConfig,
-    resolve: (value: string) => void,
-    reject: (reason?: any) => void
-  ): void {
-    try {
-      this.log(`[${existingState.id}] Resuming existing download from ${existingState.receivedBytes}/${existingState.totalBytes} bytes`);
-      
-      const session = params.window.webContents.session;
-      const offset = existingState.receivedBytes;
-      
-      // Set up the will-download handler for the resumed download
-      const resumeHandler = (event: any, item: any, webContents: any) => {
-        // Remove the handler immediately to prevent interference
-        session.removeListener('will-download', resumeHandler);
-        
-        // Create DownloadData instance for the resumed download
-        const downloadData = new DownloadData();
-        downloadData.id = existingState.id;
-        downloadData.item = item;
-        downloadData.event = event;
-        downloadData.webContents = webContents;
-        downloadData.resolvedFilename = existingState.fileName;
-        downloadData.projectId = existingState.projectId;
-        downloadData.fileId = existingState.fileId;
-        downloadData.packageName = existingState.packageName;
-        downloadData.originalFileSize = existingState.originalFileSize;
-        downloadData.url = existingState.url;
-        downloadData.startTime = existingState.startTime;
 
-        this.downloadData[existingState.id] = downloadData;
 
-        // Set up event handlers for the resumed download
-        this.setupResumedDownloadHandlers(downloadData, params);
 
-        resolve(existingState.id);
-        this.log(`[${existingState.id}] Successfully resumed download`);
-      };
-      
-      // Add the will-download handler
-      session.once('will-download', resumeHandler);
-      
-      // Trigger the interrupted download restoration
-      session.createInterruptedDownload({
-        path: existingState.filePath,
-        urlChain: existingState.urlChain,
-        mimeType: existingState.mimeType,
-        eTag: existingState.etag,
-        offset: offset,
-        length: existingState.totalBytes,
-      });
-      
-    } catch (error) {
-      this.log(`[${existingState.id}] Failed to resume download: ${error}`);
-      reject(error);
-    }
-  }
-
-  private setupResumedDownloadHandlers(data: DownloadData, params: DownloadConfig): void {
-    const { item } = data;
-
-    // Call the onDownloadStarted callback immediately since we're resuming
-    if (params.callbacks.onDownloadStarted) {
-      params.callbacks.onDownloadStarted(data);
-    }
-
-    const onUpdated = (event: any, state: string) => {
-      if (state === 'progressing') {
-        // Update progress metrics
-        const downloadedBytes = item.getReceivedBytes();
-        const totalBytes = item.getTotalBytes();
-        data.percentCompleted = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
-        
-                 if (this.enablePersistence) {
-           this.updatePersistedState(data, {
-             status: 'downloading',
-             receivedBytes: downloadedBytes,
-             totalBytes: totalBytes,
-             etag: item.getETag(), // Update ETag during resumed download progress
-             mimeType: item.getMimeType(),
-             urlChain: item.getURLChain()
-           });
-         }
-        
-        if (params.callbacks.onDownloadProgress) {
-          params.callbacks.onDownloadProgress(data);
-        }
-      } else if (state === 'interrupted') {
-        if (this.enablePersistence) {
-          this.updatePersistedState(data, { status: 'interrupted' });
-        }
-        
-        if (params.callbacks.onDownloadInterrupted) {
-          params.callbacks.onDownloadInterrupted(data);
-        }
-      }
-    };
-
-    const onDone = (event: any, state: string) => {
-      if (this.enablePersistence) {
-        if (state === 'completed') {
-          this.updatePersistedState(data, { status: 'completed' });
-          downloadStateManager.removeDownloadState(data.id);
-          
-          if (params.callbacks.onDownloadCompleted) {
-            params.callbacks.onDownloadCompleted(data);
-          }
-        } else if (state === 'cancelled') {
-          this.updatePersistedState(data, { status: 'cancelled' });
-          downloadStateManager.removeDownloadState(data.id);
-          
-          if (params.callbacks.onDownloadCancelled) {
-            params.callbacks.onDownloadCancelled(data);
-          }
-        } else if (state === 'interrupted') {
-          this.updatePersistedState(data, { status: 'interrupted' });
-          
-          if (params.callbacks.onDownloadInterrupted) {
-            params.callbacks.onDownloadInterrupted(data);
-          }
-        }
-      }
-      
-      // Clean up event listeners
-      item.removeListener('updated', onUpdated);
-      item.removeListener('done', onDone);
-      this.cleanup(data);
-    };
-
-    item.on('updated', onUpdated);
-    item.once('done', onDone);
-  }
 }

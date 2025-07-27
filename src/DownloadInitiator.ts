@@ -2,7 +2,7 @@ import * as path from "node:path";
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from "electron";
 import { CallbackDispatcher } from "./CallbackDispatcher";
 import { DownloadData } from "./DownloadData";
-import type { DownloadConfig, DownloadManagerCallbacks } from "./types";
+import type { DownloadConfig, DownloadManagerCallbacks, ResumeDownloadInfo } from "./types";
 import { calculateDownloadMetrics, determineFilePath } from "./utils";
 
 interface DownloadInitiatorConstructorParams {
@@ -45,6 +45,10 @@ interface WillOnDownloadParams {
    * @default false
    */
   overwrite?: boolean;
+  /**
+   * Information for resuming an interrupted download
+   */
+  resumeInfo?: ResumeDownloadInfo;
 }
 
 export class DownloadInitiator {
@@ -128,12 +132,33 @@ export class DownloadInitiator {
 
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       item.pause();
+      this.log(`Download initiated for ${JSON.stringify(item)} ${JSON.stringify(event)}`);
       this.downloadData.item = item;
       this.downloadData.webContents = webContents;
       this.downloadData.event = event;
 
+      // If this is a resumed download, populate the download data with resume info
+      if (this.config.resumeInfo) {
+        this.downloadData.id = this.config.resumeInfo.id;
+        this.downloadData.resolvedFilename = this.config.resumeInfo.fileName;
+        this.downloadData.projectId = this.config.resumeInfo.projectId;
+        this.downloadData.fileId = this.config.resumeInfo.fileId;
+        this.downloadData.packageName = this.config.resumeInfo.packageName;
+        this.downloadData.originalFileSize = this.config.resumeInfo.originalFileSize;
+        this.downloadData.url = this.config.resumeInfo.url;
+        this.downloadData.startTime = this.config.resumeInfo.startTime;
+        
+        // Update the callback dispatcher with the correct ID
+        this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, downloadParams.callbacks, this.logger);
+      }
+
       if (this.onDownloadInit) {
         this.onDownloadInit(this.downloadData);
+      }
+
+      if (this.config.resumeInfo) {
+        await this.initResumedDownload();
+        return;
       }
 
       if (this.config.saveDialogOptions) {
@@ -250,6 +275,27 @@ export class DownloadInitiator {
     this.log("Initiating download item handlers");
 
     this.downloadData.resolvedFilename = path.basename(filePath);
+
+    this.augmentDownloadItem(item);
+    await this.callbackDispatcher.onDownloadStarted(this.downloadData);
+    this.onDownloadStarted(this.downloadData);
+    this.onUpdateHandler = this.generateItemOnUpdated();
+    item.on("updated", this.onUpdateHandler);
+    item.once("done", this.generateItemOnDone());
+
+    if (!item["_userInitiatedPause"]) {
+      item.resume();
+    }
+  }
+
+  /**
+   * Flow for handling a resumed download.
+   */
+  protected async initResumedDownload() {
+    const { item } = this.downloadData;
+    
+    this.log(`Resuming download for ${this.downloadData.resolvedFilename}`);
+    this.log("Initiating download item handlers for resumed download");
 
     this.augmentDownloadItem(item);
     await this.callbackDispatcher.onDownloadStarted(this.downloadData);

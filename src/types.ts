@@ -58,6 +58,26 @@ export interface DownloadPersistenceConfig {
   autoResume?: boolean;
 }
 
+/**
+ * Information needed to resume an interrupted download
+ */
+export interface ResumeDownloadInfo {
+  id: string;
+  filePath: string;
+  urlChain: string[];
+  mimeType: string;
+  etag: string;
+  offset: number;
+  length: number;
+  projectId: string;
+  fileId: string;
+  packageName: string;
+  originalFileSize: number;
+  fileName: string;
+  url: string;
+  startTime: number;
+}
+
 export interface DownloadManagerConstructorParams {
   /**
    * If defined, will log out internal debug messages. Useful for
@@ -155,6 +175,10 @@ export interface DownloadConfig {
    * Configuration for persisting download state (required if persistence is enabled)
    */
   persistenceConfig?: DownloadPersistenceConfig;
+  /**
+   * Information for resuming an interrupted download (internal use)
+   */
+  resumeInfo?: ResumeDownloadInfo;
 }
 
 export interface IElectronDownloadManager {

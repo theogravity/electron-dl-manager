@@ -117,3 +117,4 @@ dist
 .pnp.*
 .idea/
 yarn.lock
+.DS_Store
