@@ -22,11 +22,7 @@ const downloadId = await downloadManager.download({
   url: 'https://example.com/large-file.zip',
   directory: '/path/to/downloads',
   persistenceConfig: {
-    projectId: 'my-project-123',
-    fileId: 'file-456',
-    packageName: 'com.myapp.downloader',
-    originalFileSize: 1024000, // optional
-    autoResume: true // automatically resume if interrupted download found
+    restorePreviousDownload: true // automatically resume if interrupted download found
   },
   callbacks: {
     onDownloadStarted: (data) => {
@@ -40,6 +36,9 @@ const downloadId = await downloadManager.download({
     },
     onDownloadInterrupted: (data) => {
       console.log('Download interrupted:', data.id);
+    },
+    onDownloadRestored: (data) => {
+      console.log('Download restored:', data.id);
     }
   }
 });
@@ -47,7 +46,7 @@ const downloadId = await downloadManager.download({
 
 ## Auto-Resume Downloads
 
-With `autoResume: true`, the download manager will automatically check for existing incomplete downloads and resume them:
+With `restorePreviousDownload: true`, the download manager will automatically check for existing incomplete downloads and resume them:
 
 ```typescript
 // If a previous download was interrupted, this will automatically resume it
@@ -55,14 +54,14 @@ const downloadId = await downloadManager.download({
   window: mainWindow,
   url: 'https://example.com/large-file.zip',
   persistenceConfig: {
-    projectId: 'my-project-123',
-    fileId: 'file-456', // Same fileId as the interrupted download
-    packageName: 'com.myapp.downloader',
-    autoResume: true
+    restorePreviousDownload: true
   },
   callbacks: {
     onDownloadStarted: (data) => {
-      console.log('Download resumed from:', data.item.getReceivedBytes(), 'bytes');
+      console.log('Download started/resumed from:', data.item.getReceivedBytes(), 'bytes');
+    },
+    onDownloadRestored: (data) => {
+      console.log('Download restored:', data.id);
     }
   }
 });
@@ -70,104 +69,73 @@ const downloadId = await downloadManager.download({
 
 ## Restoring Interrupted Downloads
 
-On application startup, check for and restore any interrupted downloads:
+On application startup, you can check for and restore interrupted downloads using the built-in method:
 
 ```typescript
-import { downloadStateManager } from 'electron-dl-manager';
+import { ElectronDownloadManager } from 'electron-dl-manager';
 
-// Get all incomplete downloads
-const incompleteDownloads = downloadStateManager.getAllDownloadStates()
-  .filter(state => 
-    state.status === 'downloading' || 
-    state.status === 'paused' || 
-    state.status === 'interrupted'
-  );
+const downloadManager = new ElectronDownloadManager({
+  enablePersistence: true,
+  debugLogger: console.log
+});
 
-// Restore each download using Electron's createInterruptedDownload API
-for (const state of incompleteDownloads) {
-  try {
-    const session = mainWindow.webContents.session;
-    
-    const item = session.createInterruptedDownload({
-      path: state.filePath,
-      urlChain: state.urlChain,
-      mimeType: state.mimeType,
-      eTag: state.etag,
-      offset: state.receivedBytes,
-      length: state.totalBytes,
-    });
+// Get IDs of interrupted downloads that were found
+const restoredDownloadIds = await downloadManager.restoreInterruptedDownloads();
 
-    // Set up event handlers for the restored download
-    item.on('updated', (event, itemState) => {
-      if (itemState === 'progressing') {
-        downloadStateManager.updateDownloadState(state.id, {
-          status: 'downloading',
-          receivedBytes: item.getReceivedBytes(),
-          totalBytes: item.getTotalBytes()
-        });
-      }
-    });
+console.log(`Found ${restoredDownloadIds.length} interrupted downloads`);
 
-    item.once('done', (event, itemState) => {
-      if (itemState === 'completed') {
-        downloadStateManager.removeDownloadState(state.id);
-        console.log('Restored download completed:', state.fileName);
-      } else if (itemState === 'interrupted') {
-        downloadStateManager.updateDownloadState(state.id, { 
-          status: 'interrupted' 
-        });
-      }
-    });
+// Note: The actual restoration happens automatically when you call download() 
+// with the same URL and restorePreviousDownload: true
+```
 
-    console.log('Restored download:', state.fileName);
-  } catch (error) {
-    console.error('Failed to restore download:', error);
-  }
-}
+### Alternative: Manual State Access
+
+If you need direct access to the download states (for advanced use cases), you can access them through the download manager's internal state:
+
+```typescript
+// This is an advanced use case - the state manager is internal to ElectronDownloadManager
+// In most cases, you should use restoreInterruptedDownloads() instead
+
+// To clear all persisted states:
+downloadManager.clearPersistedStates();
 ```
 
 ## Manual State Management
 
-You can also manually manage download states:
+The download manager handles state management automatically. The available methods for managing persistence are:
 
 ```typescript
-import { downloadStateManager } from 'electron-dl-manager';
+// Clear all persisted download states
+downloadManager.clearPersistedStates();
 
-// Get a specific download state
-const state = downloadStateManager.getDownloadState('download-id');
-
-// Update download state
-downloadStateManager.updateDownloadState('download-id', {
-  status: 'paused',
-  receivedBytes: 512000
-});
-
-// Remove completed downloads
-downloadStateManager.removeDownloadState('download-id');
-
-// Clear all states
-downloadStateManager.clearAllDownloadStates();
+// Get interrupted downloads to restore
+const interruptedIds = await downloadManager.restoreInterruptedDownloads();
 ```
+
+**Note**: Direct state manipulation is handled internally by the download manager. The state persistence works automatically when persistence is enabled.
 
 ## Configuration Options
 
-### DownloadPersistenceConfig
-- restorePreviousDownload?: boolean;
+### DownloadManagerConstructorParams
+- `enablePersistence?: boolean` - Enables download state persistence (default: false)
+- `debugLogger?: (message: string) => void` - Optional debug logger
+
+### PersistenceConfig (in download params)
+- `restorePreviousDownload?: boolean` - Automatically resume interrupted downloads with matching ETag
 
 ### PersistedDownloadState
 
 The persistent state includes:
-- Basic identifiers (id, projectId, fileId, packageName)
-- Download metadata (url, urlChain, fileName, filePath)
+- Basic identifiers (id, fileName, filePath)
+- Download metadata (urlChain, mimeType, etag)
 - Progress information (totalBytes, receivedBytes, status)
 - Timing information (startTime, lastUpdateTime)
-- Server metadata (mimeType, etag) for proper resumption
 
 ## Notes
 
 - Persistence is stored in `{userData}/download-states.json`
 - Downloads are automatically removed from persistent state when completed or cancelled
-- With `autoResume: true`, the library automatically handles download restoration using `session.createInterruptedDownload`
+- With `restorePreviousDownload: true`, the library automatically handles download restoration using `session.createInterruptedDownload`
 - All download metadata (ETag, urlChain, mimeType, etc.) is properly captured and stored for reliable resumption
-- Make sure to use the same `projectId`, `fileId`, and `packageName` combination when resuming downloads
-- The library validates ETag and other metadata to ensure download integrity during resumption 
+- The library matches previous downloads by ETag to ensure download integrity during resumption
+- Auto-resume works by detecting matching ETag from previous interrupted downloads 

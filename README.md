@@ -14,6 +14,7 @@ Use cases:
 - Get progress updates on the download
 - Be able to cancel / pause / resume downloads
 - Support multiple downloads at once
+- Resume interrupted downloads between application sessions (see [Persistence Usage](./USAGE_PERSISTENCE.md))
 
 Electron 26.0.0 or later is required.
 
@@ -53,6 +54,7 @@ manager.resumeDownload(id);
 - [Electron File Download Manager](#electron-file-download-manager)
 - [Installation](#installation)
 - [Getting started](#getting-started)
+- [Download Persistence](./USAGE_PERSISTENCE.md) - Resume interrupted downloads
 - [API](#api)
   - [Class: `ElectronDownloadManager`](#class-ElectronDownloadManager)
     - [`constructor()`](#constructor)
@@ -64,6 +66,8 @@ manager.resumeDownload(id);
     - [`resumeDownload()`](#resumedownload)
     - [`getActiveDownloadCount()`](#getactivedownloadcount)
     - [`getDownloadData()`](#getdownloaddata)
+    - [`restoreInterruptedDownloads()`](#restoreinterrupteddownloads)
+    - [`clearPersistedStates()`](#clearpersistedstates)
   - [Class: `DownloadData`](#class-downloaddata)
     - [Properties](#properties)
       - [Formatting download progress](#formatting-download-progress)
@@ -180,6 +184,11 @@ interface DownloadManagerConstructorParams {
    * how frequent it can be.
    */
   debugLogger?: (message: string) => void
+  /**
+   * If true, enables download state persistence for resuming interrupted downloads
+   * @default false
+   */
+  enablePersistence?: boolean
 }
 ```
 
@@ -237,6 +246,12 @@ interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
+  /**
+   * Configuration for persisting download state (required if persistence is enabled)
+   */
+  persistenceConfig?: {
+    restorePreviousDownload?: boolean
+  }
 }
 ```
 
@@ -272,6 +287,11 @@ interface DownloadManagerCallbacks {
    * connection, the server going down, etc.
    */
   onDownloadInterrupted: (data: DownloadData) => void
+  /**
+   * When the download has been restored. This is called when a download
+   * is resumed from a previous state.
+   */
+  onDownloadRestored?: (data: DownloadData) => void
   /**
    * When an error has been encountered.
    * Note: The signature is (error, <maybe some data>).
@@ -318,6 +338,22 @@ Returns the download data for a download.
 
 ```typescript
 getDownloadData(id: string): DownloadData
+```
+
+### `restoreInterruptedDownloads()`
+
+Restores interrupted downloads from persistent state. Only available if persistence is enabled.
+
+```typescript
+restoreInterruptedDownloads(): Promise<string[]>
+```
+
+### `clearPersistedStates()`
+
+Clears all persisted download states. Only available if persistence is enabled.
+
+```typescript
+clearPersistedStates(): void
 ```
 
 ## Class: `DownloadData`
