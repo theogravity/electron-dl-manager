@@ -61,6 +61,135 @@ describe("DownloadInitiator", () => {
       // @ts-ignore TS2445
       expect(downloadInitiator.initNonInteractiveDownload).toHaveBeenCalled();
     });
+
+    describe("with persistence and restorePreviousDownload", () => {
+      let mockDownloadStateManager;
+
+      beforeEach(() => {
+        mockDownloadStateManager = {
+          findPreviousDownloadState: jest.fn(),
+        };
+      });
+
+      it("should restore previous download when found", async () => {
+        const mockPreviousState = {
+          id: 'existing-download-id',
+          filePath: '/path/to/previous/file.txt',
+          urlChain: ['https://example.com/file.txt'],
+          mimeType: 'text/plain',
+          etag: 'test-etag',
+          receivedBytes: 500,
+          totalBytes: 1000,
+        };
+
+        mockDownloadStateManager.findPreviousDownloadState.mockReturnValue(mockPreviousState);
+        mockItem.cancel = jest.fn();
+        mockItem.setSavePath = jest.fn();
+
+        const mockSession = {
+          once: jest.fn(),
+          createInterruptedDownload: jest.fn(),
+        };
+        mockWebContents.session = mockSession;
+
+        const downloadInitiator = new DownloadInitiator({
+          restorePreviousDownload: true,
+          downloadStateManager: mockDownloadStateManager,
+        });
+
+        downloadInitiator.generateOnWillDownloadRestored = jest.fn().mockReturnValue(jest.fn());
+
+        await downloadInitiator.generateOnWillDownload({
+          callbacks,
+        })(mockEvent, mockItem, mockWebContents);
+
+        expect(mockDownloadStateManager.findPreviousDownloadState).toHaveBeenCalledWith(mockItem);
+        expect(mockItem.cancel).toHaveBeenCalled();
+        expect(mockItem.setSavePath).toHaveBeenCalledWith(mockPreviousState.filePath);
+        expect(mockSession.once).toHaveBeenCalledWith("will-download", expect.any(Function));
+        expect(mockSession.createInterruptedDownload).toHaveBeenCalledWith({
+          path: mockPreviousState.filePath,
+          urlChain: mockPreviousState.urlChain,
+          mimeType: mockPreviousState.mimeType,
+          eTag: mockPreviousState.etag,
+          offset: mockPreviousState.receivedBytes,
+          length: mockPreviousState.totalBytes,
+        });
+        expect(downloadInitiator.downloadData.id).toBe(mockPreviousState.id);
+        expect(downloadInitiator.downloadData.resolvedFilename).toBe(mockPreviousState.filePath);
+      });
+
+      it("should proceed with normal download when no previous download found", async () => {
+        mockDownloadStateManager.findPreviousDownloadState.mockReturnValue(undefined);
+
+        const downloadInitiator = new DownloadInitiator({
+          restorePreviousDownload: true,
+          downloadStateManager: mockDownloadStateManager,
+          onDownloadInit: jest.fn(),
+        });
+
+        downloadInitiator.initNonInteractiveDownload = jest.fn();
+
+        await downloadInitiator.generateOnWillDownload({
+          callbacks,
+        })(mockEvent, mockItem, mockWebContents);
+
+        expect(mockDownloadStateManager.findPreviousDownloadState).toHaveBeenCalledWith(mockItem);
+        expect(downloadInitiator.onDownloadInit).toHaveBeenCalled();
+        expect(downloadInitiator.initNonInteractiveDownload).toHaveBeenCalled();
+      });
+
+      it("should handle createInterruptedDownload errors gracefully", async () => {
+        const mockPreviousState = {
+          id: 'existing-download-id',
+          filePath: '/path/to/previous/file.txt',
+          urlChain: ['https://example.com/file.txt'],
+          mimeType: 'text/plain',
+          etag: 'test-etag',
+          receivedBytes: 500,
+          totalBytes: 1000,
+        };
+
+        mockDownloadStateManager.findPreviousDownloadState.mockReturnValue(mockPreviousState);
+        
+        const mockSession = {
+          once: jest.fn(),
+          createInterruptedDownload: jest.fn().mockImplementation(() => {
+            throw new Error('Creation failed');
+          }),
+        };
+        mockWebContents.session = mockSession;
+
+        const downloadInitiator = new DownloadInitiator({
+          restorePreviousDownload: true,
+          downloadStateManager: mockDownloadStateManager,
+        });
+
+        // Should not throw - error should be handled gracefully
+        await expect(downloadInitiator.generateOnWillDownload({
+          callbacks,
+        })(mockEvent, mockItem, mockWebContents)).resolves.not.toThrow();
+      });
+    });
+  });
+
+  describe("generateOnWillDownloadRestored", () => {
+    it("should handle restored download", async () => {
+      const downloadInitiator = new DownloadInitiator({});
+      
+      downloadInitiator.onDownloadRestored = jest.fn();
+      downloadInitiator.initRestoreDownload = jest.fn();
+
+      const restoredHandler = downloadInitiator.generateOnWillDownloadRestored({
+        callbacks,
+      });
+
+      await restoredHandler(mockEvent, mockItem, mockWebContents);
+
+      expect(downloadInitiator.downloadData.item).toBe(mockItem);
+      expect(downloadInitiator.onDownloadRestored).toHaveBeenCalledWith(downloadInitiator.downloadData);
+      expect(downloadInitiator.initRestoreDownload).toHaveBeenCalled();
+    });
   });
 
   describe("initSaveAsInteractiveDownload", () => {
