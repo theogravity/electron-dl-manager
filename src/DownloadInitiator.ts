@@ -154,11 +154,13 @@ export class DownloadInitiator {
         if (previousDownloadState) {
           this.log(`Found previous download state: ${JSON.stringify(previousDownloadState)}`);
           try {
-          item.setSavePath(previousDownloadState.filePath);
-          this.downloadData.resolvedFilename = previousDownloadState.filePath;
-          this.downloadData.id = previousDownloadState.id;
-          webContents.session.once("will-download", this.generateOnWillDownloadRestored(downloadParams));
-          webContents.session.createInterruptedDownload({
+            this.downloadData.resolvedFilename = previousDownloadState.filePath;
+            this.downloadData.id = previousDownloadState.id;
+            // This is necessary so that the tiny little duplicate file triggered by the downloader is removed
+            item.cancel();
+            item.setSavePath(previousDownloadState.filePath);
+            webContents.session.once("will-download", this.generateOnWillDownloadRestored(downloadParams));
+            webContents.session.createInterruptedDownload({
               path: previousDownloadState.filePath,
               urlChain: previousDownloadState.urlChain,
               mimeType: previousDownloadState.mimeType,
