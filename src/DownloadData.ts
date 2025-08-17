@@ -1,6 +1,34 @@
 import type { DownloadItem, Event, WebContents } from "electron";
 import { generateRandomId } from "./utils";
 
+export interface RestoreDownloadData {
+  /**
+   * Download id
+   */
+  id: string;
+  url: string;
+  /**
+   * The path and filename where the download will be saved.
+   */
+  fileSaveAsPath: string;
+  urlChain: string[];
+  mimeType: string;
+  /**
+   * The ETag of the download, if available.
+   * This is used to resume downloads.
+   */
+  eTag: string;
+  receivedBytes: number;
+  totalBytes: number;
+}
+
+export interface DownloadDataConfig {
+  /**
+   * Download id
+   */
+  id?: string;
+}
+
 /**
  * Contains the data for a download.
  */
@@ -51,9 +79,13 @@ export class DownloadData {
    * If the download was interrupted, the state in which it was interrupted from
    */
   interruptedVia?: "in-progress" | "completed";
+  /**
+   * True if the download was from a restore
+   */
+  fromRestore?: boolean;
 
-  constructor() {
-    this.id = generateRandomId();
+  constructor(config: DownloadDataConfig = {}) {
+    this.id = config.id || generateRandomId();
     this.resolvedFilename = "testFile.txt";
     this.percentCompleted = 0;
     this.cancelledFromSaveAsDialog = false;
@@ -62,6 +94,22 @@ export class DownloadData {
     this.event = {} as Event;
     this.downloadRateBytesPerSecond = 0;
     this.estimatedTimeRemainingSeconds = 0;
+  }
+
+  /**
+   * Returns data necessary for restoring a download
+   */
+  getRestoreDownloadData(): RestoreDownloadData {
+    return {
+      id: this.id,
+      fileSaveAsPath: this.item.getSavePath(),
+      url: this.item.getURL(),
+      urlChain: this.item.getURLChain(),
+      eTag: this.item.getETag(),
+      totalBytes: this.item.getTotalBytes(),
+      mimeType: this.item.getMimeType(),
+      receivedBytes: this.item.getReceivedBytes(),
+    }
   }
 
   isDownloadInProgress() {

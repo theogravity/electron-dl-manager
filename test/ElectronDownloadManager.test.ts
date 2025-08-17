@@ -21,13 +21,36 @@ describe("ElectronDownloadManager", () => {
     expect(downloadData.item.cancel).toHaveBeenCalled();
   });
 
-  it("should pause download", () => {
-    const downloadData = createMockDownloadData().downloadData;
+  it("should pause download and return restore data", () => {
+    const { downloadData, item } = createMockDownloadData();
+    const mockRestoreData = {
+      id: downloadData.id,
+      url: "https://example.com/test.txt",
+      fileSaveAsPath: "/path/to/save",
+      urlChain: ["https://example.com/test.txt"],
+      mimeType: "text/plain",
+      eTag: "etag123",
+      receivedBytes: 500,
+      totalBytes: 1000,
+    };
+
+    downloadData.getRestoreDownloadData.mockReturnValue(mockRestoreData);
 
     const downloadManager = new ElectronDownloadManager();
     downloadManager.downloadData = { [downloadData.id]: downloadData };
-    downloadManager.pauseDownload(downloadData.id);
+    
+    const result = downloadManager.pauseDownload(downloadData.id);
+    
     expect(downloadData.item.pause).toHaveBeenCalled();
+    expect(result).toEqual(mockRestoreData);
+  });
+
+  it("should pause download and return undefined when download not found", () => {
+    const downloadManager = new ElectronDownloadManager();
+    
+    const result = downloadManager.pauseDownload("non-existent-id");
+    
+    expect(result).toBeUndefined();
   });
 
   it("should resume download", () => {
@@ -103,5 +126,97 @@ describe("ElectronDownloadManager", () => {
 
     // Assert that the downloadId will be a string once the promise resolves
     await expect(downloadPromise).resolves.toEqual(expect.any(String));
+  });
+
+  it("should restore download when download is not registered", async () => {
+    const downloadManager = new ElectronDownloadManager();
+    const { item } = createMockDownloadData();
+    const mockRestoreData = {
+      id: "restore-id",
+      url: "https://example.com/test.txt",
+      fileSaveAsPath: "/path/to/save",
+      urlChain: ["https://example.com/test.txt"],
+      mimeType: "text/plain",
+      eTag: "etag123",
+      receivedBytes: 500,
+      totalBytes: 1000,
+    };
+
+    const params = {
+      window: {
+        webContents: {
+          session: {
+            once: jest.fn().mockImplementation((event, handler) => {
+              // Trigger the event handler manually with mock data
+              const mockWebContents = {};
+              handler(null, item, mockWebContents);
+            }),
+            createInterruptedDownload: jest.fn(),
+          },
+        },
+      } as any,
+      restoreData: mockRestoreData,
+      callbacks: {} as any,
+    };
+
+    // Call restoreDownload which registers the event and triggers createInterruptedDownload
+    const restorePromise = downloadManager.restoreDownload(params);
+
+    // Jest tick to make sure all Promises have a chance to resolve
+    await new Promise(process.nextTick);
+
+    // Assert that the event listener for "will-download" has been added
+    expect(params.window.webContents.session.once).toBeCalledWith("will-download", expect.any(Function));
+    
+    // Assert that createInterruptedDownload was called with the correct parameters
+    expect(params.window.webContents.session.createInterruptedDownload).toBeCalledWith({
+      path: mockRestoreData.fileSaveAsPath,
+      urlChain: mockRestoreData.urlChain,
+      mimeType: mockRestoreData.mimeType,
+      eTag: mockRestoreData.eTag,
+      offset: mockRestoreData.receivedBytes,
+      length: mockRestoreData.totalBytes,
+    });
+
+    // Assert that the downloadId will be a string once the promise resolves
+    await expect(restorePromise).resolves.toEqual(expect.any(String));
+  });
+
+  it("should call resumeDownload when download is already registered", async () => {
+    const { downloadData, item } = createMockDownloadData();
+    const downloadManager = new ElectronDownloadManager();
+    
+    // Add the download to the manager
+    downloadManager.downloadData = { [downloadData.id]: downloadData };
+    
+    const mockRestoreData = {
+      id: downloadData.id, // Use the same ID as the registered download
+      url: "https://example.com/test.txt",
+      fileSaveAsPath: "/path/to/save",
+      urlChain: ["https://example.com/test.txt"],
+      mimeType: "text/plain",
+      eTag: "etag123",
+      receivedBytes: 500,
+      totalBytes: 1000,
+    };
+
+    const params = {
+      window: {} as any,
+      restoreData: mockRestoreData,
+      callbacks: {} as any,
+    };
+
+    // Mock the resumeDownload method to verify it's called
+    const resumeSpy = jest.spyOn(downloadManager, 'resumeDownload');
+
+    // Call restoreDownload which should call resumeDownload since download is already registered
+    const result = downloadManager.restoreDownload(params);
+
+    // Assert that resumeDownload was called with the correct ID
+    expect(resumeSpy).toHaveBeenCalledWith(downloadData.id);
+
+    // Since restoreDownload is async, it returns a Promise that resolves to undefined
+    // when it calls resumeDownload and returns early
+    await expect(result).resolves.toBeUndefined();
   });
 });

@@ -1,11 +1,10 @@
-import type { BrowserWindow } from "electron";
-import type { DownloadData } from "./DownloadData";
+import type {DownloadData, RestoreDownloadData} from "./DownloadData";
 import { DownloadInitiator } from "./DownloadInitiator";
 import type {
   DebugLoggerFn,
   DownloadConfig,
   DownloadManagerConstructorParams,
-  IElectronDownloadManager,
+  IElectronDownloadManager, RestoreDownloadConfig,
 } from "./types";
 import { truncateUrl } from "./utils";
 
@@ -69,17 +68,19 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   }
 
   /**
-   * Pauses a download
+   * Pauses a download and returns the data necessary
+   * to restore it later via restoreDownload() if the download exists.
    */
-  pauseDownload(id: string) {
+  pauseDownload(id: string): RestoreDownloadData | undefined {
     const data = this.downloadData[id];
 
     if (data?.item) {
       this.log(`[${id}] Pausing download`);
       data.item.pause();
-    } else {
-      this.log(`[${id}] Download ${id} not found for pausing`);
+      return data.getRestoreDownloadData()
     }
+
+    this.log(`[${id}] Download ${id} not found for pausing`);
   }
 
   /**
@@ -101,6 +102,53 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    */
   getActiveDownloadCount() {
     return Object.values(this.downloadData).filter((data) => data.isDownloadInProgress()).length;
+  }
+
+  /**
+   * Restores a download that is not registered in the download manager.
+   * If it is already registered, calls resumeDownload() instead.
+   */
+  async restoreDownload(params: RestoreDownloadConfig) {
+    if (this.getDownloadData(params.restoreData.id)) {
+      this.resumeDownload(params.restoreData.id);
+      return;
+    }
+
+    return this.downloadQueue.add(
+      () =>
+        new Promise<string>((resolve, reject) => {
+          try {
+            const resumeData = params.restoreData;
+            const downloadInitiator = new DownloadInitiator({
+              id: resumeData.id,
+              debugLogger: this.logger,
+              onCleanup: (data) => {
+                this.cleanup(data);
+              },
+              onDownloadInit: (data) => {
+                this.downloadData[data.id] = data;
+                resolve(data.id);
+              },
+            });
+
+            this.log(`[${downloadInitiator.getDownloadId()}] Restoring download for url: ${truncateUrl(params.restoreData.url)}`);
+            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload({
+              ...params,
+              isRestoring: true
+            }));
+            params.window.webContents.session.createInterruptedDownload({
+              path: resumeData.fileSaveAsPath,
+              urlChain: resumeData.urlChain,
+              mimeType: resumeData.mimeType,
+              eTag: resumeData.eTag,
+              offset: resumeData.receivedBytes,
+              length: resumeData.totalBytes,
+            });
+          } catch (e) {
+            reject(e);
+          }
+        }),
+    );
   }
 
   /**
@@ -140,6 +188,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   }
 
   protected cleanup(data: DownloadData) {
+    this.log(`[${data.id}] Removing download from manager`);
     delete this.downloadData[data.id];
   }
 }

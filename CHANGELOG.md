@@ -1,3 +1,14 @@
+# 4.1.0 (2025-08-17)
+
+*Thanks to [@AngeloGiurano](https://github.com/AngeloGiurano) for 
+contributing the research and initial code for the restoration feature.*
+
+Adds the ability to *restore* a download that was interrupted, when the browser window is closed, but the app remains running.
+
+Support for persistent partial downloads (after an app closes) will be added in a future release.
+
+See README.md for more information.
+
 # 4.0.0 (2025-04-14)
 
 **Breaking Changes:**

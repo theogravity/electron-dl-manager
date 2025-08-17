@@ -18,25 +18,67 @@ function createWindow(): void {
     }
   })
 
+  const mainWindow2 = new BrowserWindow({
+    width: 900,
+    height: 670,
+    show: false,
+    autoHideMenuBar: true,
+    ...(process.platform === 'linux' ? { icon } : {}),
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false
+    }
+  })
+
   mainWindow.on('ready-to-show', async () => {
     mainWindow.show()
 
-    const manager = new ElectronDownloadManager();
+    const manager = new ElectronDownloadManager({
+      // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+      debugLogger: (message) => {
+        console.log(message)
+      }
+    });
 
     // Start a download
     const id = await manager.download({
       window: mainWindow,
-      url: 'https://alkjsdflksjdflk.com/file.zip',
+      url: 'https://downloads.cursor.com/production/e50823e9ded15fddfd743c7122b4724130c25df8/linux/x64/Cursor-1.4.3-x86_64.AppImage',
+      saveAsFilename: 'test333333.AppImage',
       callbacks: {
         onDownloadCancelled: async (data) => {
           console.log('canceled', data)
         },
+        onDownloadInterrupted: async (data) => {
+          console.log('interrupted', data.getResumeDownloadData())
+        }
       }
-    });
+    })
 
-    manager.cancelDownload(id);
-    manager.pauseDownload(id);
-    manager.resumeDownload(id);
+    setTimeout(async () => {
+      const data = manager.pauseDownload(id);
+      console.log(data);
+      mainWindow.close();
+
+      await manager.restoreDownload({
+        window: mainWindow2,
+        restoreData: data,
+        callbacks: {
+          onDownloadCompleted: async (data) => {
+            console.log('completed', data)
+          },
+          onDownloadStarted: async (data) => {
+            console.log('started', data)
+          },
+          onDownloadCancelled: async (data) => {
+            console.log('canceled', data)
+          },
+          onDownloadInterrupted: async (data) => {
+            console.log('interrupted', data.getResumeDownloadData())
+          }
+        }
+      });
+    }, 3000)
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
