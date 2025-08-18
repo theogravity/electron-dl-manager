@@ -10,7 +10,7 @@ export const DownloadInitiator = jest.fn().mockImplementation((config) => {
     onCleanup: jest.fn(),
     callbackDispatcher: new CallbackDispatcher(),
     downloadData: new DownloadData(),
-    config: { callbacks: {} },
+    config: {},
     log: jest.fn(),
     getDownloadId: jest.fn(),
     getDownloadData: jest.fn(),

@@ -1,3 +1,19 @@
+# 4.2.0 (2025-08-17)
+
+Adds support for persisting downloads when the application closes, allowing them to be restored later. This is useful for long-running downloads that might be interrupted by app restarts.
+
+**New Features:**
+- Added `persistOnAppClose` option to `download()` method
+- Added `onDownloadPersisted` callback for when downloads are persisted
+- Added `app` parameter to both `download()` and `restoreDownload()` methods
+- Enhanced `RestoreDownloadData` interface with `startTime`, `percentCompleted`, and `persistedFilePath` fields
+- Downloads are automatically persisted to temporary files with `.download` extension when the app is about to close
+
+**Breaking Changes:**
+- `restoreDownload()` now requires the `app` parameter to be provided
+
+See README.md for detailed usage examples.
+
 # 4.1.0 (2025-08-17)
 
 *Thanks to [@AngeloGiurano](https://github.com/AngeloGiurano) for 

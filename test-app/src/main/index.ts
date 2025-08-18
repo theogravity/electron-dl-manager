@@ -1,8 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'node:path'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { ElectronDownloadManager } from 'electron-dl-manager';
+import * as os from 'node:os'
 
 function createWindow(): void {
   // Create the browser window.
@@ -40,35 +42,32 @@ function createWindow(): void {
       }
     });
 
-    // Start a download
-    const id = await manager.download({
-      window: mainWindow,
-      url: 'https://downloads.cursor.com/production/e50823e9ded15fddfd743c7122b4724130c25df8/linux/x64/Cursor-1.4.3-x86_64.AppImage',
-      saveAsFilename: 'test333333.AppImage',
-      callbacks: {
-        onDownloadCancelled: async (data) => {
-          console.log('canceled', data)
-        },
-        onDownloadInterrupted: async (data) => {
-          console.log('interrupted', data.getResumeDownloadData())
-        }
-      }
-    })
+    // Check if the metadata file exists
+    const metadataFilePath = join(os.homedir(), 'Downloads', 'test333333.AppImage.download.metadata');
+    let data;
+    try {
+      data = JSON.parse(readFileSync(metadataFilePath, 'utf-8'));
+    } catch (error) {
+      console.error('Error reading metadata file:', error);
+      data = null;
+    }
 
-    setTimeout(async () => {
-      const data = manager.pauseDownload(id);
-      console.log(data);
-      mainWindow.close();
-
+    if (data) {
+      // Restore a download
       await manager.restoreDownload({
-        window: mainWindow2,
+        app,
+        window: mainWindow,
         restoreData: data,
         callbacks: {
           onDownloadCompleted: async (data) => {
             console.log('completed', data)
           },
           onDownloadStarted: async (data) => {
-            console.log('started', data)
+            console.log(data.item.getReceivedBytes())
+
+            setInterval(() => {
+              console.log(data.item.getReceivedBytes())
+            }, 1000)
           },
           onDownloadCancelled: async (data) => {
             console.log('canceled', data)
@@ -77,8 +76,52 @@ function createWindow(): void {
             console.log('interrupted', data.getResumeDownloadData())
           }
         }
-      });
-    }, 3000)
+      })
+    } else {
+      // Start a download
+      await manager.download({
+        app,
+        window: mainWindow,
+        url: 'https://downloads.cursor.com/production/e50823e9ded15fddfd743c7122b4724130c25df8/linux/x64/Cursor-1.4.3-x86_64.AppImage',
+        saveAsFilename: 'test333333.AppImage',
+        persistOnAppClose: true,
+        callbacks: {
+          onError: (error) => {
+            console.log(error)
+          },
+          onDownloadPersisted: async (_, restoreData) => {
+            console.log('persisted', restoreData)
+            writeFileSync(`${restoreData.persistedFilePath}.metadata`, JSON.stringify(restoreData))
+          }
+        }
+      })
+
+
+      setTimeout(async () => {
+        app.quit();
+
+        /*
+        await manager.restoreDownload({
+          window: mainWindow2,
+          restoreData: data,
+          callbacks: {
+            onDownloadCompleted: async (data) => {
+              console.log('completed', data)
+            },
+            onDownloadStarted: async (data) => {
+              console.log('started', data)
+            },
+            onDownloadCancelled: async (data) => {
+              console.log('canceled', data)
+            },
+            onDownloadInterrupted: async (data) => {
+              console.log('interrupted', data.getResumeDownloadData())
+            }
+          }
+        });
+         */
+      }, 3000)
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {

@@ -1,8 +1,9 @@
 import * as path from "node:path";
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from "electron";
+import { renameSync, copyFileSync } from "node:fs";
 import { CallbackDispatcher } from "./CallbackDispatcher";
-import { DownloadData } from "./DownloadData";
-import type {DownloadConfig, DownloadManagerCallbacks } from "./types";
+import { DownloadData, type RestoreDownloadData } from "./DownloadData";
+import type { DownloadConfig, DownloadManagerCallbacks } from "./types";
 import { calculateDownloadMetrics, determineFilePath } from "./utils";
 
 interface DownloadInitiatorConstructorParams {
@@ -27,13 +28,13 @@ interface DownloadInitiatorConstructorParams {
    * @param id The download data
    */
   onDownloadInit?: (id: DownloadData) => void;
+  /**
+   * The user callbacks to define to listen for download events
+   */
+  callbacks: DownloadManagerCallbacks;
 }
 
 interface WillOnDownloadParams {
-  /**
-   * The callbacks to define to listen for download events
-   */
-  callbacks: DownloadManagerCallbacks;
   /**
    * If defined, will show a save dialog when the user
    * downloads a file.
@@ -59,9 +60,9 @@ interface WillOnDownloadParams {
    */
   overwrite?: boolean;
   /**
-   * If true, download is being restored from restore data
+   * Data for restoring a download.
    */
-  isRestoring?: boolean;
+  restoreData?: RestoreDownloadData;
 }
 
 export class DownloadInitiator {
@@ -101,7 +102,7 @@ export class DownloadInitiator {
     this.onCleanup = config.onCleanup || (() => {});
     this.onDownloadInit = config.onDownloadInit || (() => {});
     this.config = {} as DownloadConfig;
-    this.callbackDispatcher = {} as CallbackDispatcher;
+    this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, config.callbacks, this.logger);
   }
 
   protected log(message: string) {
@@ -128,7 +129,8 @@ export class DownloadInitiator {
    */
   generateOnWillDownload(downloadParams: WillOnDownloadParams) {
     this.config = downloadParams;
-    this.callbackDispatcher = new CallbackDispatcher(this.downloadData.id, downloadParams.callbacks, this.logger);
+
+    this.downloadData.percentCompleted = this.config.restoreData?.percentCompleted || 0;
 
     return async (event: Event, item: DownloadItem, webContents: WebContents): Promise<void> => {
       item.pause();
@@ -145,7 +147,7 @@ export class DownloadInitiator {
         return;
       }
 
-      await this.initNonInteractiveDownload(this.config.isRestoring);
+      await this.initNonInteractiveDownload(!!this.config.restoreData);
     };
   }
 
@@ -188,10 +190,10 @@ export class DownloadInitiator {
         if (this.downloadData.isDownloadCompleted()) {
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
         } else {
-                  this.onUpdateHandler = this.generateItemOnUpdated();
-        this.onDoneHandler = this.generateItemOnDone();
-        item.on("updated", this.onUpdateHandler);
-        item.once("done", this.onDoneHandler);
+          this.onUpdateHandler = this.generateItemOnUpdated();
+          this.onDoneHandler = this.generateItemOnDone();
+          item.on("updated", this.onUpdateHandler);
+          item.once("done", this.onDoneHandler);
         }
 
         if (!item["_userInitiatedPause"]) {
@@ -247,9 +249,7 @@ export class DownloadInitiator {
 
     const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite });
 
-    if (isRestoring) {
-      this.downloadData.fromRestore = true;
-    } else {
+    if (!isRestoring) {
       this.log(`Setting save path to ${filePath}`);
       item.setSavePath(filePath);
     }
@@ -322,11 +322,15 @@ export class DownloadInitiator {
           break;
         }
         case "cancelled":
-          this.log(`Download cancelled. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
+          this.log(
+            `Download cancelled. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`,
+          );
           await this.callbackDispatcher.onDownloadCancelled(this.downloadData);
           break;
         case "interrupted":
-          this.log(`Download interrupted. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`);
+          this.log(
+            `Download interrupted. Total bytes: ${this.downloadData.item.getReceivedBytes()} / ${this.downloadData.item.getTotalBytes()}`,
+          );
           this.downloadData.interruptedVia = "completed";
           await this.callbackDispatcher.onDownloadInterrupted(this.downloadData);
           break;
@@ -357,5 +361,67 @@ export class DownloadInitiator {
 
     this.onUpdateHandler = undefined;
     this.onDoneHandler = undefined;
+  }
+
+  private getPersistDownloadFilename() {
+    // Append .download extension to the filename
+    return `${this.downloadData.resolvedFilename}.download`;
+  }
+
+  /**
+   * Persists the download to an alternative location.
+   * This is useful for saving the download state when the app is about to close.
+   * It copies the current download file to a new location with a `.download` extension.
+   * If the download is already completed or cancelled, it does nothing.
+   */
+  persistDownload() {
+    if (
+      !this.downloadData.item ||
+      this.downloadData.item.getState() === "completed" ||
+      this.downloadData.item.getState() === "cancelled"
+    ) {
+      this.log(
+        `Download ${this.downloadData.resolvedFilename} is already completed, cancelled or does not exist; no need to persist.`,
+      );
+      return;
+    }
+
+    this.downloadData.item.pause();
+
+    const originalPath = this.downloadData.item.getSavePath();
+    const persistPath = path.join(path.dirname(originalPath), this.getPersistDownloadFilename());
+
+    this.log(`Persisting download to ${persistPath}`);
+
+    try {
+      copyFileSync(originalPath, persistPath);
+      this.downloadData.persistedFilePath = persistPath;
+      this.log(`Download persisted successfully to ${persistPath}`);
+      this.callbackDispatcher.onDownloadPersisted(this.downloadData);
+    } catch (error) {
+      this.callbackDispatcher.handleError(new Error(`Failed to persist download: ${error}`));
+    }
+  }
+
+  /**
+   * Restores a download from a persisted state.
+   */
+  restorePersistedDownload(restoreData: RestoreDownloadData) {
+    if (!restoreData.persistedFilePath) {
+      this.log("No persisted file path found for download, cannot restore.");
+      return;
+    }
+
+    const originalPath = restoreData.fileSaveAsPath;
+    const restorePath = restoreData.persistedFilePath;
+
+    this.log(`Restoring download from ${restorePath} to ${originalPath}`);
+
+    try {
+      renameSync(restorePath, originalPath);
+      this.log(`Download restored successfully from ${restorePath} to ${originalPath}`);
+    } catch (error) {
+      this.callbackDispatcher.handleError(new Error(`Failed to restore download: ${error}`));
+    }
   }
 }

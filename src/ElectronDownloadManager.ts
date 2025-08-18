@@ -1,10 +1,11 @@
-import type {DownloadData, RestoreDownloadData} from "./DownloadData";
+import type { DownloadData, RestoreDownloadData } from "./DownloadData";
 import { DownloadInitiator } from "./DownloadInitiator";
 import type {
   DebugLoggerFn,
   DownloadConfig,
   DownloadManagerConstructorParams,
-  IElectronDownloadManager, RestoreDownloadConfig,
+  IElectronDownloadManager,
+  RestoreDownloadConfig,
 } from "./types";
 import { truncateUrl } from "./utils";
 
@@ -77,7 +78,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
     if (data?.item) {
       this.log(`[${id}] Pausing download`);
       data.item.pause();
-      return data.getRestoreDownloadData()
+      return data.getRestoreDownloadData();
     }
 
     this.log(`[${id}] Download ${id} not found for pausing`);
@@ -118,12 +119,22 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
       () =>
         new Promise<string>((resolve, reject) => {
           try {
-            const resumeData = params.restoreData;
+            const restoreData = params.restoreData;
+
+            const onWillQuit = () => {
+              downloadInitiator.persistDownload();
+            };
+
             const downloadInitiator = new DownloadInitiator({
-              id: resumeData.id,
+              id: restoreData.id,
               debugLogger: this.logger,
+              callbacks: params.callbacks,
               onCleanup: (data) => {
                 this.cleanup(data);
+
+                if (params.restoreData.persistedFilePath) {
+                  params.app.removeListener("will-quit", onWillQuit);
+                }
               },
               onDownloadInit: (data) => {
                 this.downloadData[data.id] = data;
@@ -131,19 +142,35 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               },
             });
 
-            this.log(`[${downloadInitiator.getDownloadId()}] Restoring download for url: ${truncateUrl(params.restoreData.url)}`);
-            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload({
-              ...params,
-              isRestoring: true
-            }));
+            if (restoreData.persistedFilePath) {
+              downloadInitiator.restorePersistedDownload(restoreData);
+            }
+
+            this.log(
+              `[${downloadInitiator.getDownloadId()}] Restoring download for url: ${truncateUrl(
+                params.restoreData.url,
+              )}`,
+            );
+            params.window.webContents.session.once(
+              "will-download",
+              downloadInitiator.generateOnWillDownload({
+                restoreData: params.restoreData,
+              }),
+            );
+
             params.window.webContents.session.createInterruptedDownload({
-              path: resumeData.fileSaveAsPath,
-              urlChain: resumeData.urlChain,
-              mimeType: resumeData.mimeType,
-              eTag: resumeData.eTag,
-              offset: resumeData.receivedBytes,
-              length: resumeData.totalBytes,
+              path: restoreData.fileSaveAsPath,
+              urlChain: restoreData.urlChain,
+              mimeType: restoreData.mimeType,
+              eTag: restoreData.eTag,
+              offset: restoreData.receivedBytes,
+              length: restoreData.totalBytes,
+              startTime: restoreData.startTime,
             });
+
+            if (params.restoreData.persistedFilePath) {
+              params.app.once("will-quit", onWillQuit);
+            }
           } catch (e) {
             reject(e);
           }
@@ -158,6 +185,10 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
    * Returns the id of the download.
    */
   async download(params: DownloadConfig): Promise<string> {
+    if (params.persistOnAppClose && !params.app) {
+      throw Error("You must provide the app instance to persist downloads on app close");
+    }
+
     return this.downloadQueue.add(
       () =>
         new Promise<string>((resolve, reject) => {
@@ -166,10 +197,19 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
               return reject(Error("You cannot define both saveAsFilename and saveDialogOptions to start a download"));
             }
 
+            const onWillQuit = () => {
+              downloadInitiator.persistDownload();
+            };
+
             const downloadInitiator = new DownloadInitiator({
               debugLogger: this.logger,
+              callbacks: params.callbacks,
               onCleanup: (data) => {
                 this.cleanup(data);
+
+                if (params.persistOnAppClose && params.app) {
+                  params.app.removeListener("will-quit", onWillQuit);
+                }
               },
               onDownloadInit: (data) => {
                 this.downloadData[data.id] = data;
@@ -178,8 +218,20 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
             });
 
             this.log(`[${downloadInitiator.getDownloadId()}] Registering download for url: ${truncateUrl(params.url)}`);
-            params.window.webContents.session.once("will-download", downloadInitiator.generateOnWillDownload(params));
+            params.window.webContents.session.once(
+              "will-download",
+              downloadInitiator.generateOnWillDownload({
+                saveDialogOptions: params.saveDialogOptions,
+                saveAsFilename: params.saveAsFilename,
+                directory: params.directory,
+                overwrite: params.overwrite,
+              }),
+            );
             params.window.webContents.downloadURL(params.url, params.downloadURLOptions);
+
+            if (params.persistOnAppClose && params.app) {
+              params.app.once("will-quit", onWillQuit);
+            }
           } catch (e) {
             reject(e);
           }

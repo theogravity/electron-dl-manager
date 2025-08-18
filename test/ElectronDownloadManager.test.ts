@@ -207,7 +207,7 @@ describe("ElectronDownloadManager", () => {
     };
 
     // Mock the resumeDownload method to verify it's called
-    const resumeSpy = jest.spyOn(downloadManager, 'resumeDownload');
+    const resumeSpy = jest.spyOn(downloadManager, "resumeDownload");
 
     // Call restoreDownload which should call resumeDownload since download is already registered
     const result = downloadManager.restoreDownload(params);

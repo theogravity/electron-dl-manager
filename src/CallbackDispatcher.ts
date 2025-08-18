@@ -91,6 +91,21 @@ export class CallbackDispatcher {
     }
   }
 
+  async onDownloadPersisted(downloadData: DownloadData) {
+    const { callbacks } = this;
+
+    if (callbacks.onDownloadPersisted) {
+      this.log("Calling onDownloadPersisted");
+
+      try {
+        await callbacks.onDownloadPersisted(downloadData, downloadData.getRestoreDownloadData());
+      } catch (e) {
+        this.log(`Error during onDownloadPersisted: ${e}`);
+        this.handleError(e as Error, downloadData);
+      }
+    }
+  }
+
   handleError(error: Error, downloadData?: DownloadData) {
     const { callbacks } = this;
 

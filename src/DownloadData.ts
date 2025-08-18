@@ -20,6 +20,13 @@ export interface RestoreDownloadData {
   eTag: string;
   receivedBytes: number;
   totalBytes: number;
+  startTime: number;
+  percentCompleted: number;
+  /**
+   * If persistOnAppClose is true, this is the path where the download
+   * is persisted to. This is used to restore the download later.
+   */
+  persistedFilePath?: string;
 }
 
 export interface DownloadDataConfig {
@@ -80,9 +87,9 @@ export class DownloadData {
    */
   interruptedVia?: "in-progress" | "completed";
   /**
-   * True if the download was from a restore
+   * If defined, this is the path where the download is persisted to.
    */
-  fromRestore?: boolean;
+  persistedFilePath?: string;
 
   constructor(config: DownloadDataConfig = {}) {
     this.id = config.id || generateRandomId();
@@ -109,7 +116,10 @@ export class DownloadData {
       totalBytes: this.item.getTotalBytes(),
       mimeType: this.item.getMimeType(),
       receivedBytes: this.item.getReceivedBytes(),
-    }
+      startTime: this.item.getStartTime(),
+      percentCompleted: this.percentCompleted,
+      persistedFilePath: this.persistedFilePath,
+    };
   }
 
   isDownloadInProgress() {

@@ -14,6 +14,7 @@ Use cases:
 - Get progress updates on the download
 - Be able to cancel / pause / resume downloads
 - Support multiple downloads at once
+- Persist downloads when the app closes, allowing them to be restored / resumed later
 
 Electron 26.0.0 or later is required.
 
@@ -53,6 +54,9 @@ manager.resumeDownload(id);
 - [Electron File Download Manager](#electron-file-download-manager)
 - [Installation](#installation)
 - [Getting started](#getting-started)
+- [Download Restoration & Persistence](#download-restoration--persistence)
+  - [Basic Download Restoration](#basic-download-restoration)
+  - [Download Persistence](#download-persistence)
 - [API](#api)
   - [Class: `ElectronDownloadManager`](#class-ElectronDownloadManager)
     - [`constructor()`](#constructor)
@@ -162,6 +166,200 @@ ipcMain.handle('download-file', async (event, args) => {
 });
 ```
 
+# Download Restoration & Persistence
+
+This section covers advanced download management features that go beyond simple pause/resume functionality. These features are essential for applications that need to handle downloads across different browser windows, app restarts, or when downloads are interrupted by external factors.
+
+## When to Use These Features
+
+### Regular Pause/Resume vs. Restoration
+- 
+- **Pause/Resume**: Use `pauseDownload()` and `resumeDownload()` when you want to temporarily stop and restart a download within the same browser window and session.
+- **Restoration**: Use `restoreDownload()` when you need to resume a download in a different browser window, after the original window has been closed, or when the download manager instance has been destroyed.
+- **Persistence**: Use the `persistOnAppClose` option in `download()` when you want downloads to automatically survive app restarts, crashes, or when the user closes the application.
+
+## Basic Download Restoration
+
+### Interface: `RestoreDownloadConfig`
+
+```typescript
+interface RestoreDownloadConfig {
+  /**
+   * The Electron.App instance
+   */
+  app: Electron.App
+  /**
+   * The Electron.BrowserWindow instance where the download should be restored
+   */
+  window: BrowserWindow
+  /**
+   * Data required for resuming the download, returned from pauseDownload()
+   */
+  restoreData: RestoreDownloadData
+  /**
+   * The callbacks to define to listen for download events
+   */
+  callbacks: DownloadManagerCallbacks
+  /**
+   * Electron.DownloadURLOptions to pass to the downloadURL method
+   *
+   * @see https://www.electronjs.org/docs/latest/api/session#sesdownloadurlurl-options
+   */
+  downloadURLOptions?: Electron.DownloadURLOptions
+}
+```
+
+### Interface: `RestoreDownloadData`
+
+```typescript
+interface RestoreDownloadData {
+  /**
+   * Download id
+   */
+  id: string
+  /**
+   * The URL of the download
+   */
+  url: string
+  /**
+   * The path and filename where the download will be saved
+   */
+  fileSaveAsPath: string
+  /**
+   * The chain of URLs that led to this download
+   */
+  urlChain: string[]
+  /**
+   * The MIME type of the file being downloaded
+   */
+  mimeType: string
+  /**
+   * The ETag of the download, if available. This is used to resume downloads
+   */
+  eTag: string
+  /**
+   * The number of bytes already received
+   */
+  receivedBytes: number
+  /**
+   * The total number of bytes to download
+   */
+  totalBytes: number
+  /**
+   * The timestamp when the download started
+   */
+  startTime: number
+  /**
+   * The percentage of the download that has been completed
+   */
+  percentCompleted: number
+  /**
+   * If persistOnAppClose is true, this is the path where the download
+   * is persisted to. This is used to restore the download later.
+   */
+  persistedFilePath?: string
+}
+```
+
+### Example: Basic Download Restoration
+
+```typescript
+// Pause a download and get restore data
+const restoreData = manager.pauseDownload(downloadId);
+
+if (restoreData) {
+  // Later, in a different browser window
+  const newDownloadId = await manager.restoreDownload({
+    app,
+    window: newBrowserWindow,
+    restoreData,
+    callbacks: {
+      onDownloadStarted: async ({ id, item, resolvedFilename }) => {
+        console.log(`Restored download ${id} started`);
+      },
+      onDownloadProgress: async ({ id, percentCompleted }) => {
+        console.log(`Restored download ${id} progress: ${percentCompleted}%`);
+      },
+      onDownloadCompleted: async ({ id, item }) => {
+        console.log(`Restored download ${id} completed`);
+      },
+      onError: (err, data) => {
+        console.error('Error in restored download:', err);
+      }
+    }
+  });
+}
+```
+
+## Download Persistence
+
+Version 4.2.0 introduces the ability to automatically persist downloads when the application closes, allowing them to be restored later. This feature is fundamentally different from manual pause/resume because it:
+
+- **Automatically triggers** when the app is about to close (listens to the `will-quit` event)
+- **Preserves download state** including progress, file paths, and metadata
+- **Survives app crashes** and unexpected shutdowns
+- **Works across app restarts** without requiring user intervention
+- **Handles file management** by creating temporary `.download` files that are automatically restored
+
+### Enabling Download Persistence
+
+To enable download persistence, set `persistOnAppClose: true` and provide the `app` instance:
+
+```typescript
+const id = await manager.download({
+  app, // Electron.App instance
+  window: mainWindow,
+  url: 'https://example.com/large-file.zip',
+  saveAsFilename: 'large-file.zip',
+  persistOnAppClose: true,
+  callbacks: {
+    onDownloadPersisted: async (data, restoreData) => {
+      console.log('Download persisted:', restoreData.persistedFilePath);
+      // Save restoreData to a file or database for later restoration
+      writeFileSync('download-metadata.json', JSON.stringify(restoreData));
+    },
+    onDownloadCompleted: async (data) => {
+      console.log('Download completed');
+    },
+    onError: (err, data) => {
+      console.error('Download error:', err);
+    }
+  }
+});
+```
+
+### Restoring Persisted Downloads
+
+When the app restarts, you can restore persisted downloads using the saved metadata:
+
+```typescript
+// Read the saved metadata
+const metadata = JSON.parse(readFileSync('download-metadata.json', 'utf-8'));
+
+// Restore the download
+await manager.restoreDownload({
+  app,
+  window: mainWindow,
+  restoreData: metadata,
+  callbacks: {
+    onDownloadStarted: async (data) => {
+      console.log('Persisted download restored and started');
+    },
+    onDownloadProgress: async (data) => {
+      console.log(`Progress: ${data.percentCompleted}%`);
+    },
+    onDownloadCompleted: async (data) => {
+      console.log('Persisted download completed');
+    },
+    onError: (err, data) => {
+      console.error('Error in restored download:', err);
+    }
+  }
+});
+```
+
+**Note:** The `persistedFilePath` in the restore data points to a temporary file with a `.download` extension. The library automatically handles moving this file to the correct location when restoring.
+
 # API
 
 ## Class: `ElectronDownloadManager`
@@ -239,6 +437,16 @@ interface DownloadParams {
    * @default false
    */
   overwrite?: boolean
+  /**
+   * If true, will persist the download when the app closes, allowing it to be restored later.
+   * Requires the `app` parameter to be provided.
+   * @default false
+   */
+  persistOnAppClose?: boolean
+  /**
+   * The Electron.App instance. Required if persistOnAppClose is enabled.
+   */
+  app?: Electron.App
 }
 ```
 
@@ -274,6 +482,11 @@ interface DownloadManagerCallbacks {
    * connection, the server going down, etc.
    */
   onDownloadInterrupted: (data: DownloadData) => void
+  /**
+   * When the download has been persisted for later restoration.
+   * This callback is called when persistOnAppClose is enabled and the app is about to close.
+   */
+  onDownloadPersisted?: (data: DownloadData, restoreDownloadData: RestoreDownloadData) => void
   /**
    * When an error has been encountered.
    * Note: The signature is (error, <maybe some data>).
@@ -320,98 +533,7 @@ If the download is already registered in the current download manager, this meth
 restoreDownload(params: RestoreDownloadConfig): Promise<string>
 ```
 
-#### Interface: `RestoreDownloadConfig`
-
-```typescript
-interface RestoreDownloadConfig {
-  /**
-   * The Electron.BrowserWindow instance where the download should be restored
-   */
-  window: BrowserWindow
-  /**
-   * Data required for resuming the download, returned from pauseDownload()
-   */
-  restoreData: RestoreDownloadData
-  /**
-   * The callbacks to define to listen for download events
-   */
-  callbacks: DownloadManagerCallbacks
-  /**
-   * Electron.DownloadURLOptions to pass to the downloadURL method
-   *
-   * @see https://www.electronjs.org/docs/latest/api/session#sesdownloadurlurl-options
-   */
-  downloadURLOptions?: Electron.DownloadURLOptions
-}
-```
-
-#### Interface: `RestoreDownloadData`
-
-```typescript
-interface RestoreDownloadData {
-  /**
-   * Download id
-   */
-  id: string
-  /**
-   * The URL of the download
-   */
-  url: string
-  /**
-   * The path and filename where the download will be saved
-   */
-  fileSaveAsPath: string
-  /**
-   * The chain of URLs that led to this download
-   */
-  urlChain: string[]
-  /**
-   * The MIME type of the file being downloaded
-   */
-  mimeType: string
-  /**
-   * The ETag of the download, if available. This is used to resume downloads
-   */
-  eTag: string
-  /**
-   * The number of bytes already received
-   */
-  receivedBytes: number
-  /**
-   * The total number of bytes to download
-   */
-  totalBytes: number
-}
-```
-
-**Example usage:**
-
-```typescript
-// Pause a download and get restore data
-const restoreData = manager.pauseDownload(downloadId);
-
-if (restoreData) {
-  // Later, in a different browser window
-  const newDownloadId = await manager.restoreDownload({
-    window: newBrowserWindow,
-    restoreData,
-    callbacks: {
-      onDownloadStarted: async ({ id, item, resolvedFilename }) => {
-        console.log(`Restored download ${id} started`);
-      },
-      onDownloadProgress: async ({ id, percentCompleted }) => {
-        console.log(`Restored download ${id} progress: ${percentCompleted}%`);
-      },
-      onDownloadCompleted: async ({ id, item }) => {
-        console.log(`Restored download ${id} completed`);
-      },
-      onError: (err, data) => {
-        console.error('Error in restored download:', err);
-      }
-    }
-  });
-}
-```
+**Note:** See the [Download Restoration & Persistence](#download-restoration--persistence) section for detailed information about restoring downloads and using the persistence feature.
 
 ### `getActiveDownloadCount()`
 
@@ -483,6 +605,11 @@ class DownloadData {
    * If the download was interrupted, the state in which it was interrupted from
    */
   interruptedVia?: 'in-progress' | 'completed'
+  /**
+   * If defined, this is the path where the download is persisted to.
+   * This is set when persistOnAppClose is enabled and the download is persisted.
+   */
+  persistedFilePath?: string
 }
 ```
 

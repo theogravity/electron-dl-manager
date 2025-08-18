@@ -1,5 +1,5 @@
 import type { BrowserWindow, SaveDialogOptions } from "electron";
-import type {DownloadData, RestoreDownloadData} from "./DownloadData";
+import type { DownloadData, RestoreDownloadData } from "./DownloadData";
 
 /**
  * The download has started
@@ -21,6 +21,13 @@ export type DownloadCompletedFn = (data: DownloadData) => Promise<void> | void;
  * The download was interrupted
  */
 export type DownloadInterruptedFn = (data: DownloadData) => Promise<void> | void;
+/**
+ * The download has been persisted for later restoration
+ */
+export type DownloadPersistedFn = (
+  data: DownloadData,
+  restoreDownloadData: RestoreDownloadData,
+) => Promise<void> | void;
 /**
  * The download has failed
  */
@@ -70,6 +77,10 @@ export interface DownloadManagerCallbacks {
    */
   onDownloadInterrupted?: DownloadInterruptedFn;
   /**
+   * When the download has been persisted for later restoration.
+   */
+  onDownloadPersisted?: DownloadPersistedFn;
+  /**
    * When an error has been encountered.
    * Note: The signature is (error, <maybe some data>).
    */
@@ -77,6 +88,10 @@ export interface DownloadManagerCallbacks {
 }
 
 export interface RestoreDownloadConfig {
+  /**
+   * The Electron.App instance
+   */
+  app: Electron.App;
   /**
    * The Electron.BrowserWindow instance
    */
@@ -98,6 +113,10 @@ export interface RestoreDownloadConfig {
 }
 
 export interface DownloadConfig {
+  /**
+   * The Electron.App instance. Required if persistOnAppClose is enabled.
+   */
+  app?: Electron.App;
   /**
    * The Electron.BrowserWindow instance
    */
@@ -140,6 +159,10 @@ export interface DownloadConfig {
    * @default false
    */
   overwrite?: boolean;
+  /**
+   * Options for persisting a partial download when the application closes for use with restoring it later.
+   */
+  persistOnAppClose?: boolean;
 }
 
 export interface IElectronDownloadManager {
