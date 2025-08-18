@@ -1,8 +1,9 @@
 import { DownloadData, ElectronDownloadManager } from "../src";
 import { createMockDownloadData } from "../src/__mocks__/DownloadData";
+import { vi, describe, it, expect } from "vitest";
 
-jest.mock("unused-filename");
-jest.mock("../src/DownloadInitiator");
+vi.mock("unused-filename");
+vi.mock("../src/DownloadInitiator");
 
 describe("ElectronDownloadManager", () => {
   it("should get download data", () => {
@@ -100,13 +101,13 @@ describe("ElectronDownloadManager", () => {
       window: {
         webContents: {
           session: {
-            once: jest.fn().mockImplementation((event, handler) => {
+            once: vi.fn().mockImplementation((event, handler) => {
               // Trigger the event handler manually with mock data
               const mockWebContents = {};
               handler(null, item, mockWebContents);
             }),
           },
-          downloadURL: jest.fn(),
+          downloadURL: vi.fn(),
         },
       } as any,
       callbacks: {} as any,
@@ -115,7 +116,7 @@ describe("ElectronDownloadManager", () => {
     // Call download which registers the event and triggers downloadURL
     const downloadPromise = downloadManager.download(params);
 
-    // Jest tick to make sure all Promises have a chance to resolve
+    // Vitest tick to make sure all Promises have a chance to resolve
     await new Promise(process.nextTick);
 
     // Assert that the event listener for "will-download" has been added
@@ -146,12 +147,12 @@ describe("ElectronDownloadManager", () => {
       window: {
         webContents: {
           session: {
-            once: jest.fn().mockImplementation((event, handler) => {
+            once: vi.fn().mockImplementation((event, handler) => {
               // Trigger the event handler manually with mock data
               const mockWebContents = {};
               handler(null, item, mockWebContents);
             }),
-            createInterruptedDownload: jest.fn(),
+            createInterruptedDownload: vi.fn(),
           },
         },
       } as any,
@@ -162,7 +163,7 @@ describe("ElectronDownloadManager", () => {
     // Call restoreDownload which registers the event and triggers createInterruptedDownload
     const restorePromise = downloadManager.restoreDownload(params);
 
-    // Jest tick to make sure all Promises have a chance to resolve
+    // Vitest tick to make sure all Promises have a chance to resolve
     await new Promise(process.nextTick);
 
     // Assert that the event listener for "will-download" has been added
@@ -207,7 +208,7 @@ describe("ElectronDownloadManager", () => {
     };
 
     // Mock the resumeDownload method to verify it's called
-    const resumeSpy = jest.spyOn(downloadManager, "resumeDownload");
+    const resumeSpy = vi.spyOn(downloadManager, "resumeDownload");
 
     // Call restoreDownload which should call resumeDownload since download is already registered
     const result = downloadManager.restoreDownload(params);

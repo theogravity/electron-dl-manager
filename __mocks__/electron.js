@@ -1,32 +1,29 @@
-jest.mock('electron', () => {
-  const originalModule = jest.requireActual('electron')
+import { vi } from 'vitest'
 
-  return {
-    ...originalModule,
-    app: {
-      getPath: jest.fn().mockReturnValue('/default/path'),
-    },
-    BrowserWindow: jest.fn().mockImplementation(() => ({
-      webContents: {
-        downloadURL: jest.fn(),
-        session: {
-          once: jest.fn(),
-          on: jest.fn(),
-          off: jest.fn(),
-          addListener: jest.fn(),
-          removeListener: jest.fn(),
-        },
-        debugger: {
-          attach: jest.fn(),
-          sendCommand: jest.fn(),
-          detach: jest.fn(),
-          on: jest.fn(),
-          off: jest.fn(),
-          once: jest.fn(),
-          addListener: jest.fn(),
-          removeListener: jest.fn(),
-        },
+export default {
+  app: {
+    getPath: vi.fn().mockReturnValue('/default/path'),
+  },
+  BrowserWindow: vi.fn().mockImplementation(() => ({
+    webContents: {
+      downloadURL: vi.fn(),
+      session: {
+        once: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
       },
-    })),
-  }
-})
+      debugger: {
+        attach: vi.fn(),
+        sendCommand: vi.fn(),
+        detach: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+    },
+  })),
+}

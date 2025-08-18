@@ -3,12 +3,13 @@ import { createMockDownloadData } from "../src/__mocks__/DownloadData";
 import { determineFilePath } from "../src/utils";
 import path from "node:path";
 import UnusedFilename from "unused-filename";
+import { vi, describe, it, expect, beforeEach } from "vitest";
 
-jest.mock("../src/utils");
-jest.mock("../src/CallbackDispatcher");
-jest.mock("unused-filename");
-jest.mock("electron");
-jest.useFakeTimers();
+vi.mock("../src/utils");
+vi.mock("../src/CallbackDispatcher");
+vi.mock("unused-filename");
+vi.mock("electron");
+vi.useFakeTimers();
 
 describe("DownloadInitiator", () => {
   let callbacks;
@@ -19,7 +20,7 @@ describe("DownloadInitiator", () => {
   let mockEmitter;
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    vi.clearAllMocks();
 
     // use the callbackDispatcher instead for evaluating the callbacks
     callbacks = {};
@@ -39,7 +40,7 @@ describe("DownloadInitiator", () => {
         callbacks,
       });
 
-      downloadInitiator.initSaveAsInteractiveDownload = jest.fn();
+      downloadInitiator.initSaveAsInteractiveDownload = vi.fn();
 
       downloadInitiator.generateOnWillDownload({
         saveDialogOptions: {
@@ -55,7 +56,7 @@ describe("DownloadInitiator", () => {
         callbacks,
       });
 
-      downloadInitiator.initNonInteractiveDownload = jest.fn();
+      downloadInitiator.initNonInteractiveDownload = vi.fn();
 
       downloadInitiator.generateOnWillDownload({})(mockEvent, mockItem, mockWebContents);
 
@@ -79,7 +80,7 @@ describe("DownloadInitiator", () => {
         saveDialogOptions: {},
       })(mockEvent, mockItem, mockWebContents);
 
-      await jest.runAllTimersAsync();
+      await vi.runAllTimersAsync();
 
       // @ts-ignore - accessing private property for testing
       expect(downloadInitiator.callbackDispatcher.onDownloadCancelled).toHaveBeenCalled();
@@ -102,7 +103,7 @@ describe("DownloadInitiator", () => {
           saveDialogOptions: {},
         })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         expect(mockItem.resume).not.toHaveBeenCalled();
       });
@@ -119,13 +120,13 @@ describe("DownloadInitiator", () => {
         mockItem["_userInitiatedPause"] = false;
         mockItem.getSavePath.mockReturnValueOnce("/some/path");
 
-        const resumeSpy = jest.spyOn(mockItem, "resume");
+        const resumeSpy = vi.spyOn(mockItem, "resume");
 
         await downloadInitiator.generateOnWillDownload({
           saveDialogOptions: {},
         })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         expect(resumeSpy).toHaveBeenCalled();
       });
@@ -145,7 +146,7 @@ describe("DownloadInitiator", () => {
           saveDialogOptions: {},
         })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         // @ts-ignore - accessing private property for testing
         expect(downloadInitiator.callbackDispatcher.onDownloadStarted).toHaveBeenCalled();
@@ -166,7 +167,7 @@ describe("DownloadInitiator", () => {
           saveDialogOptions: {},
         })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         // @ts-ignore - accessing private property for testing
         expect(downloadInitiator.callbackDispatcher.onDownloadCompleted).toHaveBeenCalled();
@@ -206,9 +207,9 @@ describe("DownloadInitiator", () => {
 
         await downloadInitiator.generateOnWillDownload({})(mockEvent, mockItem, mockWebContents);
 
-        const resumeSpy = jest.spyOn(mockItem, "resume");
+        const resumeSpy = vi.spyOn(mockItem, "resume");
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         expect(resumeSpy).not.toHaveBeenCalled();
       });
@@ -222,14 +223,14 @@ describe("DownloadInitiator", () => {
         mockItem["_userInitiatedPause"] = true;
 
         determineFilePath.mockReturnValueOnce("/some/path/test.txt");
-        const resumeSpy = jest.spyOn(mockItem, "resume");
+        const resumeSpy = vi.spyOn(mockItem, "resume");
 
         await downloadInitiator.generateOnWillDownload({
           directory: "/some/path",
           saveAsFilename: "test.txt",
         })(mockEvent, mockItem, mockWebContents);
 
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         expect(resumeSpy).toHaveBeenCalled();
       });
@@ -245,8 +246,8 @@ describe("DownloadInitiator", () => {
         // @ts-ignore - accessing private property for testing
         downloadInitiator.downloadData = mockDownloadData;
         // @ts-ignore - accessing private property for testing
-        downloadInitiator.callbackDispatcher.onDownloadProgress = jest.fn();
-        downloadInitiator.updateProgress = jest.fn();
+        downloadInitiator.callbackDispatcher.onDownloadProgress = vi.fn();
+        downloadInitiator.updateProgress = vi.fn();
 
         const itemOnUpdated = downloadInitiator.generateItemOnUpdated();
 
@@ -264,7 +265,7 @@ describe("DownloadInitiator", () => {
         // @ts-ignore - accessing private property for testing
         downloadInitiator.downloadData = mockDownloadData;
         // @ts-ignore - accessing private property for testing
-        downloadInitiator.callbackDispatcher.onDownloadInterrupted = jest.fn();
+        downloadInitiator.callbackDispatcher.onDownloadInterrupted = vi.fn();
 
         const itemOnUpdated = downloadInitiator.generateItemOnUpdated();
 
@@ -284,8 +285,8 @@ describe("DownloadInitiator", () => {
         // @ts-ignore - accessing private property for testing
         downloadInitiator.downloadData = mockDownloadData;
         // @ts-ignore - accessing private property for testing
-        downloadInitiator.callbackDispatcher.onDownloadCompleted = jest.fn();
-        downloadInitiator.cleanup = jest.fn();
+        downloadInitiator.callbackDispatcher.onDownloadCompleted = vi.fn();
+        downloadInitiator.cleanup = vi.fn();
 
         const itemOnDone = downloadInitiator.generateItemOnDone();
 
@@ -304,8 +305,8 @@ describe("DownloadInitiator", () => {
       // @ts-ignore - accessing private property for testing
       downloadInitiator.downloadData = mockDownloadData;
       // @ts-ignore - accessing private property for testing
-      downloadInitiator.callbackDispatcher.onDownloadCancelled = jest.fn();
-      downloadInitiator.cleanup = jest.fn();
+      downloadInitiator.callbackDispatcher.onDownloadCancelled = vi.fn();
+      downloadInitiator.cleanup = vi.fn();
 
       const itemOnDone = downloadInitiator.generateItemOnDone();
 
@@ -323,8 +324,8 @@ describe("DownloadInitiator", () => {
       // @ts-ignore - accessing private property for testing
       downloadInitiator.downloadData = mockDownloadData;
       // @ts-ignore - accessing private property for testing
-      downloadInitiator.callbackDispatcher.onDownloadInterrupted = jest.fn();
-      downloadInitiator.cleanup = jest.fn();
+      downloadInitiator.callbackDispatcher.onDownloadInterrupted = vi.fn();
+      downloadInitiator.cleanup = vi.fn();
 
       const itemOnDone = downloadInitiator.generateItemOnDone();
 
@@ -341,13 +342,13 @@ describe("DownloadInitiator", () => {
       });
       // @ts-ignore - accessing private property for testing
       downloadInitiator.downloadData = mockDownloadData;
-      downloadInitiator.updateProgress = jest.fn();
+      downloadInitiator.updateProgress = vi.fn();
 
       determineFilePath.mockReturnValueOnce("/some/path/test.txt");
 
       await downloadInitiator.generateOnWillDownload({})(mockEvent, mockItem, mockWebContents);
 
-      await jest.runAllTimersAsync();
+      await vi.runAllTimersAsync();
 
       mockItem.pause();
       mockEmitter.emit("updated", "", "progressing");

@@ -1,4 +1,6 @@
-export const truncateUrl = jest.fn();
-export const getFilenameFromMime = jest.fn();
-export const generateRandomId = jest.fn();
-export const determineFilePath = jest.fn();
+import { vi } from 'vitest'
+
+export const truncateUrl = vi.fn();
+export const getFilenameFromMime = vi.fn();
+export const generateRandomId = vi.fn();
+export const determineFilePath = vi.fn();

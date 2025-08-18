@@ -9,13 +9,14 @@ import {
   truncateUrl,
 } from "../src/utils";
 import { createMockDownloadData } from "../src/__mocks__/DownloadData";
+import { vi, describe, test, expect, beforeEach } from "vitest";
 
-jest.mock("electron");
+vi.mock("electron");
 
 let mockedItemData;
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   mockedItemData = createMockDownloadData().item;
 });
 
@@ -100,7 +101,7 @@ describe("calculateDownloadMetrics", () => {
   const mockStartTimeSecs = 1000;
 
   beforeAll(() => {
-    jest.spyOn(global, "Date").mockImplementation(() => {
+    vi.spyOn(global, "Date").mockImplementation(() => {
       return {
         // // Mock current time (in ms) 1000 seconds after the start time
         getTime: () => 2000 * mockStartTimeSecs,
@@ -109,7 +110,7 @@ describe("calculateDownloadMetrics", () => {
   });
 
   afterAll(() => {
-    jest.restoreAllMocks();
+    vi.restoreAllMocks();
   });
 
   it("calculates the download metrics correctly for positive elapsed time", () => {

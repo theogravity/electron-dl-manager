@@ -1,10 +1,12 @@
-export const CallbackDispatcher = jest.fn().mockImplementation(() => {
+import { vi } from 'vitest'
+
+export const CallbackDispatcher = vi.fn().mockImplementation(() => {
   return {
-    onDownloadStarted: jest.fn(),
-    onDownloadCompleted: jest.fn(),
-    onDownloadCancelled: jest.fn(),
-    onDownloadProgress: jest.fn(),
-    onDownloadInterrupted: jest.fn(),
-    handleError: jest.fn(),
+    onDownloadStarted: vi.fn(),
+    onDownloadCompleted: vi.fn(),
+    onDownloadCancelled: vi.fn(),
+    onDownloadProgress: vi.fn(),
+    onDownloadInterrupted: vi.fn(),
+    handleError: vi.fn(),
   };
 });

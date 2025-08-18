@@ -1,6 +1,6 @@
 tools
 biome.json
-jest.config.js
+vitest.config.ts
 test
 config
 __mocks__
