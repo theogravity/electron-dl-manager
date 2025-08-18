@@ -111,7 +111,7 @@ export class ElectronDownloadManager implements IElectronDownloadManager {
   async restoreDownload(params: RestoreDownloadConfig) {
     if (this.getDownloadData(params.restoreData.id)) {
       this.resumeDownload(params.restoreData.id);
-      return;
+      return params.restoreData.id;
     }
 
     return this.downloadQueue.add(

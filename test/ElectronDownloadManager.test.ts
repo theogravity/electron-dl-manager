@@ -38,18 +38,18 @@ describe("ElectronDownloadManager", () => {
 
     const downloadManager = new ElectronDownloadManager();
     downloadManager.downloadData = { [downloadData.id]: downloadData };
-    
+
     const result = downloadManager.pauseDownload(downloadData.id);
-    
+
     expect(downloadData.item.pause).toHaveBeenCalled();
     expect(result).toEqual(mockRestoreData);
   });
 
   it("should pause download and return undefined when download not found", () => {
     const downloadManager = new ElectronDownloadManager();
-    
+
     const result = downloadManager.pauseDownload("non-existent-id");
-    
+
     expect(result).toBeUndefined();
   });
 
@@ -167,7 +167,7 @@ describe("ElectronDownloadManager", () => {
 
     // Assert that the event listener for "will-download" has been added
     expect(params.window.webContents.session.once).toBeCalledWith("will-download", expect.any(Function));
-    
+
     // Assert that createInterruptedDownload was called with the correct parameters
     expect(params.window.webContents.session.createInterruptedDownload).toBeCalledWith({
       path: mockRestoreData.fileSaveAsPath,
@@ -185,10 +185,10 @@ describe("ElectronDownloadManager", () => {
   it("should call resumeDownload when download is already registered", async () => {
     const { downloadData, item } = createMockDownloadData();
     const downloadManager = new ElectronDownloadManager();
-    
+
     // Add the download to the manager
     downloadManager.downloadData = { [downloadData.id]: downloadData };
-    
+
     const mockRestoreData = {
       id: downloadData.id, // Use the same ID as the registered download
       url: "https://example.com/test.txt",
@@ -215,8 +215,8 @@ describe("ElectronDownloadManager", () => {
     // Assert that resumeDownload was called with the correct ID
     expect(resumeSpy).toHaveBeenCalledWith(downloadData.id);
 
-    // Since restoreDownload is async, it returns a Promise that resolves to undefined
+    // Since restoreDownload is async, it returns a Promise that resolves to the download ID
     // when it calls resumeDownload and returns early
-    await expect(result).resolves.toBeUndefined();
+    await expect(result).resolves.toBe(downloadData.id);
   });
 });
