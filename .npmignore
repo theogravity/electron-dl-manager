@@ -1,4 +1,3 @@
-tools
 biome.json
 vitest.config.ts
 test
@@ -6,3 +5,4 @@ config
 __mocks__
 .github
 test-app
+pnpm-lock.yaml

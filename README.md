@@ -618,8 +618,8 @@ class DownloadData {
 You can use the libraries [`bytes`](https://www.npmjs.com/package/bytes) and [`dayjs`](https://www.npmjs.com/package/dayjs) to format the download progress.
 
 ```bash
-$ npm install bytes dayjs
-$ npm install @types/bytes --save-dev
+$ pnpm add bytes dayjs
+$ pnpm add -D @types/bytes
 ```
 
 ```typescript

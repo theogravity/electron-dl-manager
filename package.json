@@ -16,11 +16,10 @@
     }
   },
   "scripts": {
-    "prepublishOnly": "npm run test && npm run lint && npm run build",
+    "prepublishOnly": "pnpm run test && pnpm run lint && pnpm run build",
     "build": "tsup",
     "clean": "rm -rf dist",
-    "package": "npm run build && npm pack",
-    "format": "npx @biomejs/biome format src --write && npx @biomejs/biome format test --write",
+    "format": "pnpm exec @biomejs/biome format src --write && pnpm exec @biomejs/biome format test --write",
     "lint": "biome check --no-errors-on-unmatched --write --unsafe src",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -62,10 +61,11 @@
     "electron": ">=26"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.0.6",
+    "@biomejs/biome": "2.2.0",
     "electron": "30.3.0",
-    "tsup": "^8.5.0",
-    "typescript": "^5.4.2",
-    "vitest": "^3.2.4"
-  }
+    "tsup": "8.5.0",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  },
+  "packageManager": "pnpm@10.14.0"
 }
