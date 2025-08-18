@@ -1,0 +1,16 @@
+pre-commit:
+  parallel: true
+  commands:
+    "lint and format staged files":
+      run: pnpm run lint
+      stage_fixed: true
+    "check package.json files":
+      run: pnpm run syncpack:format && pnpm run lint:packages
+      stage_fixed: true
+    "[repo] verify types":
+      run: pnpm run verify-types
+
+commit-msg:
+  commands:
+    "lint commit message":
+      run: pnpm run commitlint --edit {1}

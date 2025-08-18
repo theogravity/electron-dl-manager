@@ -1,10 +1,9 @@
 {
   "name": "electron-dl-manager",
-  "version": "4.2.0",
   "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
+  "version": "4.2.0",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
   "exports": {
     "import": {
       "types": "./dist/index.d.ts",
@@ -15,57 +14,64 @@
       "require": "./dist/index.cjs"
     }
   },
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "repository": "git@github.com:theogravity/electron-dl-manager.git",
+  "author": "Theo Gravity <theo@suteki.nu>",
+  "keywords": [
+    "app",
+    "download",
+    "downloader",
+    "electron",
+    "electron-dl",
+    "file",
+    "library",
+    "manager",
+    "multi",
+    "progress"
+  ],
   "scripts": {
-    "prepublishOnly": "pnpm run test && pnpm run lint && pnpm run build",
     "build": "tsup",
     "clean": "rm -rf dist",
+    "commitlint": "commitlint",
     "format": "pnpm exec @biomejs/biome format src --write && pnpm exec @biomejs/biome format test --write",
     "lint": "biome check --no-errors-on-unmatched --write --unsafe src",
+    "prepublishOnly": "pnpm run test && pnpm run lint && pnpm run build",
+    "lint:packages": "pnpm run lint:packages:semver && pnpm run lint:packages:mismatches",
+    "lint:packages:semver": "syncpack lint-semver-ranges",
+    "lint:packages:mismatches": "syncpack list-mismatches",
+    "syncpack:format": "syncpack format",
+    "syncpack:lint": "syncpack lint",
+    "syncpack:update": "syncpack update && syncpack fix-mismatches && pnpm i",
     "test": "vitest run",
     "test:watch": "vitest",
     "verify-types": "tsc --noEmit"
-  },
-  "publishConfig": {
-    "access": "public"
-  },
-  "files": [
-    "dist"
-  ],
-  "keywords": [
-    "electron",
-    "app",
-    "file",
-    "download",
-    "downloader",
-    "progress",
-    "multi",
-    "electron-dl",
-    "manager",
-    "library"
-  ],
-  "author": "Theo Gravity <theo@suteki.nu>",
-  "license": "MIT",
-  "homepage": "https://github.com/theogravity/electron-dl-manager",
-  "repository": {
-    "type": "git",
-    "url": "git@github.com:theogravity/electron-dl-manager.git"
-  },
-  "bugs": {
-    "url": "https://github.com/theogravity/electron-dl-manager/issues"
   },
   "dependencies": {
     "ext-name": "5.0.0",
     "unused-filename": "3.0.1"
   },
-  "peerDependencies": {
-    "electron": ">=26"
-  },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
+    "@commitlint/cli": "19.8.1",
+    "@commitlint/config-conventional": "19.8.1",
     "electron": "30.3.0",
+    "lefthook": "1.12.3",
+    "syncpack": "13.0.4",
     "tsup": "8.5.0",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
   },
-  "packageManager": "pnpm@10.14.0"
+  "peerDependencies": {
+    "electron": "30.3.0"
+  },
+  "bugs": "https://github.com/theogravity/electron-dl-manager/issues",
+  "files": [
+    "dist"
+  ],
+  "homepage": "https://github.com/theogravity/electron-dl-manager",
+  "packageManager": "pnpm@10.14.0",
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -25,11 +25,8 @@ export function createMockDownloadData() {
     isPaused: vi.fn(),
     getState: vi.fn(),
     getFilename: vi.fn().mockReturnValue("filename.txt"),
-    // @ts-ignore
     on: itemEmitter.on.bind(itemEmitter) as DownloadItem["on"],
-    // @ts-ignore
     once: itemEmitter.once.bind(itemEmitter) as DownloadItem["once"],
-    // @ts-ignore
     off: itemEmitter.off.bind(itemEmitter) as DownloadItem["off"],
   };
 
