@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import type { DownloadItem, WebContents } from "electron";
-import { type DownloadData as ActualDownloadData, generateRandomId } from "../index";
-import { vi } from 'vitest'
+import { vi } from "vitest";
+import { generateRandomId } from "../index";
 
 export const DownloadData = vi.fn().mockImplementation(() => {
   return createMockDownloadData().downloadData;

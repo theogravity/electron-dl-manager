@@ -101,11 +101,9 @@ describe("calculateDownloadMetrics", () => {
   const mockStartTimeSecs = 1000;
 
   beforeAll(() => {
-    vi.spyOn(global, "Date").mockImplementation(() => {
-      return {
-        // // Mock current time (in ms) 1000 seconds after the start time
-        getTime: () => 2000 * mockStartTimeSecs,
-      } as unknown as Date;
+    vi.spyOn(Date, "now").mockImplementation(() => {
+      // Mock current time (in ms) 1000 seconds after the start time
+      return 2000 * mockStartTimeSecs;
     });
   });
 

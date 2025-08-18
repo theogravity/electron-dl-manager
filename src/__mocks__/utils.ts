@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from "vitest";
 
 export const truncateUrl = vi.fn();
 export const getFilenameFromMime = vi.fn();

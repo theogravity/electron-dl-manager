@@ -1,6 +1,6 @@
+import { copyFileSync, renameSync } from "node:fs";
 import * as path from "node:path";
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from "electron";
-import { renameSync, copyFileSync } from "node:fs";
 import { CallbackDispatcher } from "./CallbackDispatcher";
 import { DownloadData, type RestoreDownloadData } from "./DownloadData";
 import type { DownloadConfig, DownloadManagerCallbacks } from "./types";

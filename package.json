@@ -16,8 +16,7 @@
     "clean": "node tools/cleanup",
     "package": "npm run build && npm pack",
     "format": "npx @biomejs/biome format src --write && npx @biomejs/biome format test --write",
-    "lint": "npx @biomejs/biome lint src && npx @biomejs/biome lint test",
-    "lint:check": "npx @biomejs/biome check --apply-unsafe src && npx @biomejs/biome check --apply-unsafe test",
+    "lint": "biome check --no-errors-on-unmatched --write --unsafe src",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -57,7 +56,7 @@
     "electron": ">=26"
   },
   "devDependencies": {
-    "@biomejs/biome": "1.6.3",
+    "@biomejs/biome": "2.0.6",
     "add": "^2.0.6",
     "electron": "30.3.0",
     "ts-loader": "^9.5.1",

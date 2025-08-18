@@ -1,4 +1,4 @@
-import { vi } from 'vitest'
+import { vi } from "vitest";
 import { CallbackDispatcher } from "./CallbackDispatcher";
 import { DownloadData } from "./DownloadData";
 

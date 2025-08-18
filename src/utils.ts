@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { type DownloadItem, app } from "electron";
+import { app, type DownloadItem } from "electron";
 import extName from "ext-name";
 import UnusedFilename from "unused-filename";
 
@@ -12,7 +12,7 @@ export function truncateUrl(url: string) {
 }
 
 export function generateRandomId() {
-  const currentTime = new Date().getTime();
+  const currentTime = Date.now();
   const randomNum = Math.floor(Math.random() * 1000);
   const combinedValue = currentTime.toString() + randomNum.toString();
 
@@ -81,7 +81,7 @@ export function calculateDownloadMetrics(item: DownloadItem): {
   const totalBytes = item.getTotalBytes();
   const startTimeSecs = item.getStartTime();
 
-  const currentTimeSecs = Math.floor(new Date().getTime() / 1000);
+  const currentTimeSecs = Math.floor(Date.now() / 1000);
   const elapsedTimeSecs = currentTimeSecs - startTimeSecs;
 
   // Avail in Electron 30.3.0+
