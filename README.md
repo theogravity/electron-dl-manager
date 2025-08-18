@@ -62,6 +62,7 @@ manager.resumeDownload(id);
     - [`cancelDownload()`](#canceldownload)
     - [`pauseDownload()`](#pausedownload)
     - [`resumeDownload()`](#resumedownload)
+    - [`restoreDownload()`](#restoredownload)
     - [`getActiveDownloadCount()`](#getactivedownloadcount)
     - [`getDownloadData()`](#getdownloaddata)
   - [Class: `DownloadData`](#class-downloaddata)
@@ -73,6 +74,7 @@ manager.resumeDownload(id);
     - [`isDownloadCancelled()`](#isdownloadcancelled)
     - [`isDownloadInterrupted()`](#isdownloadinterrupted)
     - [`isDownloadCompleted()`](#isdownloadcompleted)
+    - [`getRestoreDownloadData()`](#getrestoredownloaddata)
 - [Mock class](#mock-class)
 - [FAQ](#faq)
 - [Acknowledgments](#acknowledgments)
@@ -290,11 +292,15 @@ cancelDownload(id: string): void
 
 ### `pauseDownload()`
 
-Pauses a download.
+Pauses a download and returns the data necessary to restore it later via `restoreDownload()`.
 
 ```typescript
-pauseDownload(id: string): void
+pauseDownload(id: string): RestoreDownloadData | undefined
 ```
+
+**Returns:** `RestoreDownloadData` if the download exists and can be paused, `undefined` if the download is not found.
+
+**Note:** Use the returned data with `restoreDownload()` to restore a download.
 
 ### `resumeDownload()`
 
@@ -302,6 +308,109 @@ Resumes a download.
 
 ```typescript
 resumeDownload(id: string): void
+```
+
+### `restoreDownload()`
+
+Restores a download that is not registered in the download manager using data returned from `pauseDownload()`. This is useful when you need to restore a download in a different browser window or after the original window has been closed.
+
+If the download is already registered in the current download manager, this method will call `resumeDownload()` instead.
+
+```typescript
+restoreDownload(params: RestoreDownloadConfig): Promise<string>
+```
+
+#### Interface: `RestoreDownloadConfig`
+
+```typescript
+interface RestoreDownloadConfig {
+  /**
+   * The Electron.BrowserWindow instance where the download should be restored
+   */
+  window: BrowserWindow
+  /**
+   * Data required for resuming the download, returned from pauseDownload()
+   */
+  restoreData: RestoreDownloadData
+  /**
+   * The callbacks to define to listen for download events
+   */
+  callbacks: DownloadManagerCallbacks
+  /**
+   * Electron.DownloadURLOptions to pass to the downloadURL method
+   *
+   * @see https://www.electronjs.org/docs/latest/api/session#sesdownloadurlurl-options
+   */
+  downloadURLOptions?: Electron.DownloadURLOptions
+}
+```
+
+#### Interface: `RestoreDownloadData`
+
+```typescript
+interface RestoreDownloadData {
+  /**
+   * Download id
+   */
+  id: string
+  /**
+   * The URL of the download
+   */
+  url: string
+  /**
+   * The path and filename where the download will be saved
+   */
+  fileSaveAsPath: string
+  /**
+   * The chain of URLs that led to this download
+   */
+  urlChain: string[]
+  /**
+   * The MIME type of the file being downloaded
+   */
+  mimeType: string
+  /**
+   * The ETag of the download, if available. This is used to resume downloads
+   */
+  eTag: string
+  /**
+   * The number of bytes already received
+   */
+  receivedBytes: number
+  /**
+   * The total number of bytes to download
+   */
+  totalBytes: number
+}
+```
+
+**Example usage:**
+
+```typescript
+// Pause a download and get restore data
+const restoreData = manager.pauseDownload(downloadId);
+
+if (restoreData) {
+  // Later, in a different browser window
+  const newDownloadId = await manager.restoreDownload({
+    window: newBrowserWindow,
+    restoreData,
+    callbacks: {
+      onDownloadStarted: async ({ id, item, resolvedFilename }) => {
+        console.log(`Restored download ${id} started`);
+      },
+      onDownloadProgress: async ({ id, percentCompleted }) => {
+        console.log(`Restored download ${id} progress: ${percentCompleted}%`);
+      },
+      onDownloadCompleted: async ({ id, item }) => {
+        console.log(`Restored download ${id} completed`);
+      },
+      onError: (err, data) => {
+        console.error('Error in restored download:', err);
+      }
+    }
+  });
+}
 ```
 
 ### `getActiveDownloadCount()`
@@ -451,6 +560,16 @@ Returns true if the download is completed.
 ```typescript
 isDownloadCompleted(): boolean
 ```
+
+### `getRestoreDownloadData()`
+
+Returns the data necessary to restore this download later via `restoreDownload()`. This method is typically called after pausing a download to get the data needed for restoration.
+
+```typescript
+getRestoreDownloadData(): RestoreDownloadData
+```
+
+**Returns:** `RestoreDownloadData` containing all the information needed to restore the download, including the file path, URL, MIME type, ETag, and byte information.
 
 # Mock class
 

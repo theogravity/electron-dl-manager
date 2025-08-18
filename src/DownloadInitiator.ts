@@ -2,12 +2,30 @@ import * as path from "node:path";
 import type { DownloadItem, Event, SaveDialogOptions, WebContents } from "electron";
 import { CallbackDispatcher } from "./CallbackDispatcher";
 import { DownloadData } from "./DownloadData";
-import type { DownloadConfig, DownloadManagerCallbacks } from "./types";
+import type {DownloadConfig, DownloadManagerCallbacks } from "./types";
 import { calculateDownloadMetrics, determineFilePath } from "./utils";
 
 interface DownloadInitiatorConstructorParams {
+  /**
+   * The id for the download. If not provided, a random id will be generated.
+   */
+  id?: string;
+  /**
+   * A debug logger function to log messages.
+   * If not provided, no logging will occur.
+   */
   debugLogger?: (message: string) => void;
+  /**
+   * Called when the download is cleaned up.
+   * This is called after the download has completed or been cancelled.
+   * @param id The download data
+   */
   onCleanup?: (id: DownloadData) => void;
+  /**
+   * Called when the download is initialized.
+   * This is called before any download events are fired.
+   * @param id The download data
+   */
   onDownloadInit?: (id: DownloadData) => void;
 }
 
@@ -40,18 +58,14 @@ interface WillOnDownloadParams {
    * @default false
    */
   overwrite?: boolean;
+  /**
+   * If true, download is being restored from restore data
+   */
+  isRestoring?: boolean;
 }
 
 export class DownloadInitiator {
   protected logger: (message: string) => void;
-  /**
-   * The handler for the DownloadItem's `updated` event.
-   */
-  private onItemUpdated: (event: Event, state: "progressing" | "interrupted") => Promise<void>;
-  /**
-   * The handler for the DownloadItem's `done` event.
-   */
-  private onItemDone: (event: Event, state: "completed" | "cancelled" | "interrupted") => Promise<void>;
   /**
    * When the download is initiated
    */
@@ -61,7 +75,7 @@ export class DownloadInitiator {
    */
   private onCleanup: (data: DownloadData) => void;
   /**
-   * The callback dispatcher for handling download events.
+   * The callback dispatcher for handling download events back to the user
    */
   private callbackDispatcher: CallbackDispatcher;
   /**
@@ -69,13 +83,21 @@ export class DownloadInitiator {
    */
   private downloadData: DownloadData;
   private config: Omit<WillOnDownloadParams, "callbacks">;
+  /**
+   * The handler for the DownloadItem's `updated` event.
+   */
   private onUpdateHandler?: (_event: Event, state: "progressing" | "interrupted") => void;
+  /**
+   * The handler for the DownloadItem's `done` event.
+   */
+  private onDoneHandler?: (_event: Event, state: "completed" | "cancelled" | "interrupted") => void;
 
   constructor(config: DownloadInitiatorConstructorParams) {
-    this.downloadData = new DownloadData();
+    this.downloadData = new DownloadData({
+      id: config.id,
+    });
+
     this.logger = config.debugLogger || (() => {});
-    this.onItemUpdated = () => Promise.resolve();
-    this.onItemDone = () => Promise.resolve();
     this.onCleanup = config.onCleanup || (() => {});
     this.onDownloadInit = config.onDownloadInit || (() => {});
     this.config = {} as DownloadConfig;
@@ -123,7 +145,7 @@ export class DownloadInitiator {
         return;
       }
 
-      await this.initNonInteractiveDownload();
+      await this.initNonInteractiveDownload(this.config.isRestoring);
     };
   }
 
@@ -166,9 +188,10 @@ export class DownloadInitiator {
         if (this.downloadData.isDownloadCompleted()) {
           await this.callbackDispatcher.onDownloadCompleted(this.downloadData);
         } else {
-          this.onUpdateHandler = this.generateItemOnUpdated();
-          item.on("updated", this.onUpdateHandler);
-          item.once("done", this.generateItemOnDone());
+                  this.onUpdateHandler = this.generateItemOnUpdated();
+        this.onDoneHandler = this.generateItemOnDone();
+        item.on("updated", this.onUpdateHandler);
+        item.once("done", this.onDoneHandler);
         }
 
         if (!item["_userInitiatedPause"]) {
@@ -218,14 +241,19 @@ export class DownloadInitiator {
   /**
    * Flow for handling a download that doesn't require user interaction.
    */
-  protected async initNonInteractiveDownload() {
+  protected async initNonInteractiveDownload(isRestoring?: boolean) {
     const { directory, saveAsFilename, overwrite } = this.config;
     const { item } = this.downloadData;
 
     const filePath = determineFilePath({ directory, saveAsFilename, item, overwrite });
 
-    this.log(`Setting save path to ${filePath}`);
-    item.setSavePath(filePath);
+    if (isRestoring) {
+      this.downloadData.fromRestore = true;
+    } else {
+      this.log(`Setting save path to ${filePath}`);
+      item.setSavePath(filePath);
+    }
+
     this.log("Initiating download item handlers");
 
     this.downloadData.resolvedFilename = path.basename(filePath);
@@ -233,8 +261,9 @@ export class DownloadInitiator {
     this.augmentDownloadItem(item);
     await this.callbackDispatcher.onDownloadStarted(this.downloadData);
     this.onUpdateHandler = this.generateItemOnUpdated();
+    this.onDoneHandler = this.generateItemOnDone();
     item.on("updated", this.onUpdateHandler);
-    item.once("done", this.generateItemOnDone());
+    item.once("done", this.onDoneHandler);
 
     if (!item["_userInitiatedPause"]) {
       item.resume();
@@ -314,8 +343,12 @@ export class DownloadInitiator {
 
     if (item) {
       this.log("Cleaning up download item event listeners");
-      item.removeListener("updated", this.onItemUpdated);
-      item.removeListener("done", this.onItemDone);
+      if (this.onUpdateHandler) {
+        item.removeListener("updated", this.onUpdateHandler);
+      }
+      if (this.onDoneHandler) {
+        item.removeListener("done", this.onDoneHandler);
+      }
     }
 
     if (this.onCleanup) {
@@ -323,5 +356,6 @@ export class DownloadInitiator {
     }
 
     this.onUpdateHandler = undefined;
+    this.onDoneHandler = undefined;
   }
 }

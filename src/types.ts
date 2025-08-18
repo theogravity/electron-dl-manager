@@ -1,5 +1,5 @@
 import type { BrowserWindow, SaveDialogOptions } from "electron";
-import type { DownloadData } from "./DownloadData";
+import type {DownloadData, RestoreDownloadData} from "./DownloadData";
 
 /**
  * The download has started
@@ -76,6 +76,27 @@ export interface DownloadManagerCallbacks {
   onError?: ErrorFn;
 }
 
+export interface RestoreDownloadConfig {
+  /**
+   * The Electron.BrowserWindow instance
+   */
+  window: BrowserWindow;
+  /**
+   * Data required for resuming the download
+   */
+  restoreData: RestoreDownloadData;
+  /**
+   * The callbacks to define to listen for download events
+   */
+  callbacks: DownloadManagerCallbacks;
+  /**
+   * Electron.DownloadURLOptions to pass to the downloadURL method
+   *
+   * @see https://www.electronjs.org/docs/latest/api/session#sesdownloadurlurl-options
+   */
+  downloadURLOptions?: Electron.DownloadURLOptions;
+}
+
 export interface DownloadConfig {
   /**
    * The Electron.BrowserWindow instance
@@ -136,9 +157,9 @@ export interface IElectronDownloadManager {
    */
   cancelDownload(id: string): void;
   /**
-   * Pauses a download
+   * Pauses a download and returns the data necessary to restore it later
    */
-  pauseDownload(id: string): void;
+  pauseDownload(id: string): RestoreDownloadData | undefined;
   /**
    * Resumes a download
    */
@@ -151,4 +172,11 @@ export interface IElectronDownloadManager {
    * Returns the data for a download
    */
   getDownloadData(id: string): DownloadData | undefined;
+  /**
+   * Restores a download that is not registered in the download manager.
+   * If it is already registered, calls resumeDownload() instead.
+   *
+   * Returns the id of the restored download.
+   */
+  restoreDownload(params: RestoreDownloadConfig): Promise<string>;
 }

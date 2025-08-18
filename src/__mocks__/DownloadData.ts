@@ -47,6 +47,7 @@ export function createMockDownloadData() {
     isDownloadInterrupted: jest.fn(),
     isDownloadResumable: jest.fn(),
     isDownloadPaused: jest.fn(),
+    getRestoreDownloadData: jest.fn(),
     item,
   };
 

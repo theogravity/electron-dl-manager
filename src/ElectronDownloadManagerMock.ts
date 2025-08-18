@@ -1,5 +1,5 @@
 import { DownloadData } from "./DownloadData";
-import type { DownloadConfig, IElectronDownloadManager } from "./types";
+import type { DownloadConfig, IElectronDownloadManager, RestoreDownloadConfig } from "./types";
 
 /**
  * Mock version of ElectronDownloadManager
@@ -12,7 +12,9 @@ export class ElectronDownloadManagerMock implements IElectronDownloadManager {
 
   cancelDownload(_id: string): void {}
 
-  pauseDownload(_id: string): void {}
+  pauseDownload(_id: string): import("./DownloadData").RestoreDownloadData | undefined {
+    return undefined;
+  }
 
   resumeDownload(_id: string): void {}
 
@@ -24,5 +26,9 @@ export class ElectronDownloadManagerMock implements IElectronDownloadManager {
     const downloadData = new DownloadData();
     downloadData.id = id;
     return downloadData;
+  }
+
+  async restoreDownload(_params: RestoreDownloadConfig): Promise<string> {
+    return "mock-restored-download-id";
   }
 }
