@@ -51,8 +51,6 @@ export class CallbackDispatcher {
     const { callbacks } = this;
 
     if (callbacks.onDownloadProgress) {
-      this.log(` Calling onDownloadProgress ${downloadData.percentCompleted}%`);
-
       try {
         await callbacks.onDownloadProgress(downloadData);
       } catch (e) {
