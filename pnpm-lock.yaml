@@ -28,10 +28,10 @@ importers:
         specifier: 30.3.0
         version: 30.3.0
       lefthook:
-        specifier: ^1.12.3
+        specifier: 1.12.3
         version: 1.12.3
       syncpack:
-        specifier: ^13.0.4
+        specifier: 13.0.4
         version: 13.0.4(typescript@5.9.2)
       tsup:
         specifier: 8.5.0

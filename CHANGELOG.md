@@ -1,3 +1,7 @@
+# 4.2.2 (2025-11-26)
+
+- Update the `electron` peer dependency to not be an exact version
+
 # 4.2.1 (2025-11-25)
 
 - Fix `debugLogger` logging download progress despite documentation stating it does not log progress due to frequency ([#21](https://github.com/theogravity/electron-dl-manager/issues/21))

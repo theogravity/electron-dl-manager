@@ -1,7 +1,7 @@
 {
   "name": "electron-dl-manager",
   "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
-  "version": "4.2.1",
+  "version": "4.2.2",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "exports": {
@@ -63,7 +63,7 @@
     "vitest": "3.2.4"
   },
   "peerDependencies": {
-    "electron": "30.3.0"
+    "electron": ">=30.3.0"
   },
   "bugs": "https://github.com/theogravity/electron-dl-manager/issues",
   "files": [
