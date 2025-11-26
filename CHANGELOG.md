@@ -1,3 +1,7 @@
+# 4.2.3 (2025-11-26)
+
+- Switch build tool from tsup to tsdown, fix cjs references
+
 # 4.2.2 (2025-11-26)
 
 - Update the `electron` peer dependency to not be an exact version

@@ -1,17 +1,17 @@
 {
   "name": "electron-dl-manager",
   "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
-  "version": "4.2.2",
+  "version": "4.2.3",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "exports": {
     "import": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
     },
     "require": {
-      "types": "./dist/index.d.cts",
-      "require": "./dist/index.cjs"
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js"
     }
   },
   "types": "dist/index.d.ts",
@@ -31,7 +31,7 @@
     "progress"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
     "clean": "rm -rf dist",
     "commitlint": "commitlint",
     "format": "pnpm exec @biomejs/biome format src --write && pnpm exec @biomejs/biome format test --write",
@@ -58,7 +58,7 @@
     "electron": "30.3.0",
     "lefthook": "1.12.3",
     "syncpack": "13.0.4",
-    "tsup": "8.5.0",
+    "tsdown": "0.12.5",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
   },
