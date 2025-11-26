@@ -1,7 +1,7 @@
 {
   "name": "electron-dl-manager",
   "description": "A library for implementing file downloads in Electron with 'save as' dialog and id support.",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
   "exports": {

@@ -1,3 +1,7 @@
+# 4.2.1 (2025-11-25)
+
+- Fix `debugLogger` logging download progress despite documentation stating it does not log progress due to frequency ([#21](https://github.com/theogravity/electron-dl-manager/issues/21))
+
 # 4.2.0 (2025-08-17)
 
 Adds support for persisting downloads when the application closes, allowing them to be restored later. This is useful for long-running downloads that might be interrupted by app restarts.
